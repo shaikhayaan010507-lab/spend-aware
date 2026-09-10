@@ -8,12 +8,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.outlined.Category
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,256 +19,234 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ayaansaksham.spend_aware.data.local.entity.Category
 import kotlinx.coroutines.flow.StateFlow
-
-// Expanded Material palette for better user options
-private val presetColors = listOf(
-    "#F44336", "#E91E63", "#9C27B0", "#673AB7",
-    "#3F51B5", "#2196F3", "#03A9F4", "#00BCD4",
-    "#009688", "#4CAF50", "#8BC34A", "#CDDC39",
-    "#FFEB3B", "#FFC107", "#FF9800", "#FF5722",
-    "#795548", "#607D8B"
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryScreen(
     categories: StateFlow<List<Category>>,
     onAddCategory: (Category) -> Unit,
+    onUpdateCategory: (Category) -> Unit = {},
+    onDeleteCategory: (Category) -> Unit = {},
     onNavigateBack: () -> Unit
 ) {
     val categoryList by categories.collectAsState()
-    var showAddDialog by remember { mutableStateOf(false) }
+
+    var showDialog by remember { mutableStateOf(false) }
+    var categoryToEdit by remember { mutableStateOf<Category?>(null) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Categories", fontWeight = FontWeight.SemiBold) },
+                title = { Text("Categories", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { showAddDialog = true },
+                onClick = {
+                    categoryToEdit = null
+                    showDialog = true
+                },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = RoundedCornerShape(16.dp)
+                shape = CircleShape
             ) {
-                Icon(Icons.Filled.Add, contentDescription = "Add Category")
+                Icon(Icons.Default.Add, contentDescription = "Add Category")
             }
         }
     ) { paddingValues ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
                 .padding(paddingValues)
+                .padding(horizontal = 16.dp)
         ) {
-            if (categoryList.isEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(32.dp),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Category,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "No categories yet",
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "Tap the + button to add one",
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 16.dp),
-                    contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp)
-                ) {
-                    items(categoryList) { category ->
-                        CategoryRow(category)
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                }
+            item { Spacer(modifier = Modifier.height(8.dp)) }
+
+            items(categoryList) { category ->
+                CategoryItem(
+                    category = category,
+                    onEdit = {
+                        categoryToEdit = category
+                        showDialog = true
+                    },
+                    onDelete = { onDeleteCategory(category) }
+                )
             }
+
+            item { Spacer(modifier = Modifier.height(80.dp)) } // Space for FAB
         }
     }
 
-    if (showAddDialog) {
-        AddCategoryDialog(
-            onDismiss = { showAddDialog = false },
-            onConfirm = { name, colorHex ->
-                onAddCategory(
-                    Category(name = name, colorHex = colorHex, isDefault = false)
-                )
-                showAddDialog = false
+    if (showDialog) {
+        CategoryDialog(
+            category = categoryToEdit,
+            onDismiss = {
+                showDialog = false
+                categoryToEdit = null
+            },
+            onSave = { name, colorHex ->
+                if (categoryToEdit == null) {
+                    // Creating new
+                    onAddCategory(Category(name = name, colorHex = colorHex))
+                } else {
+                    // Updating existing
+                    onUpdateCategory(categoryToEdit!!.copy(name = name, colorHex = colorHex))
+                }
+                showDialog = false
+                categoryToEdit = null
             }
         )
     }
 }
 
 @Composable
-fun CategoryRow(category: Category) {
-    val parsedColor = try {
+fun CategoryItem(
+    category: Category,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    // Safely parse the color hex string
+    val circleColor = try {
         Color(android.graphics.Color.parseColor(category.colorHex))
     } catch (e: Exception) {
-        MaterialTheme.colorScheme.primary // Fallback color
+        Color.Gray // Fallback just in case
     }
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+        shape = RoundedCornerShape(12.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(parsedColor)
-            )
-            Spacer(modifier = Modifier.width(16.dp))
-            Text(
-                text = category.name,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(circleColor)
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(
+                    text = category.name,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            // 3-Dot Options Menu
+            Box {
+                IconButton(onClick = { expanded = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "Options")
+                }
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Edit") },
+                        onClick = {
+                            expanded = false
+                            onEdit()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                        onClick = {
+                            expanded = false
+                            onDelete()
+                        }
+                    )
+                }
+            }
         }
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun AddCategoryDialog(
+fun CategoryDialog(
+    category: Category?,
     onDismiss: () -> Unit,
-    onConfirm: (name: String, colorHex: String) -> Unit
+    onSave: (name: String, colorHex: String) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var selectedColor by remember { mutableStateOf(presetColors.first()) }
+    var name by remember { mutableStateOf(category?.name ?: "") }
+
+    // A professional set of Material colors for the user to choose from
+    val colorPalette = listOf("#F44336", "#E91E63", "#9C27B0", "#3F51B5", "#2196F3", "#00BCD4", "#4CAF50", "#FF9800", "#795548")
+    var selectedColor by remember { mutableStateOf(category?.colorHex ?: colorPalette[0]) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("New Category", fontWeight = FontWeight.Bold) },
+        title = { Text(text = if (category == null) "New Category" else "Edit Category", fontWeight = FontWeight.Bold) },
         text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Category name") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.Words,
-                        imeAction = ImeAction.Done
-                    ),
-                    singleLine = true
+                    label = { Text("Category Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
-                Text("Pick a color", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Text("Select Color", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // FlowRow automatically wraps items to the next line if they exceed the width
-                FlowRow(
+                // Color Picker Row
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    presetColors.forEach { colorHex ->
-                        val isSelected = selectedColor == colorHex
-                        val parsedColor = try {
-                            Color(android.graphics.Color.parseColor(colorHex))
-                        } catch (e: Exception) {
-                            Color.Gray
-                        }
+                    colorPalette.take(6).forEach { hex ->
+                        val color = Color(android.graphics.Color.parseColor(hex))
+                        val isSelected = selectedColor == hex
 
                         Box(
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(36.dp)
                                 .clip(CircleShape)
-                                .background(parsedColor)
-                                .clickable { selectedColor = colorHex }
-                                .then(
-                                    if (isSelected) Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                                    else Modifier
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (isSelected) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = "Selected",
-                                    tint = if (ColorUtils.calculateLuminance(parsedColor) > 0.5) Color.Black else Color.White,
-                                    modifier = Modifier.size(24.dp)
+                                .background(color)
+                                .border(
+                                    width = if (isSelected) 3.dp else 0.dp,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent,
+                                    shape = CircleShape
                                 )
-                            }
-                        }
+                                .clickable { selectedColor = hex }
+                        )
                     }
                 }
             }
         },
         confirmButton = {
             TextButton(
-                onClick = {
-                    if (name.isNotBlank()) {
-                        onConfirm(name.trim(), selectedColor)
-                    }
-                },
-                enabled = name.isNotBlank()
-            ) {
-                Text("Save", fontWeight = FontWeight.Bold)
-            }
+                onClick = { if (name.isNotBlank()) onSave(name, selectedColor) }
+            ) { Text("Save") }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
+            TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
-}
-
-// Helper to determine if the checkmark should be black or white based on the background color
-object ColorUtils {
-    fun calculateLuminance(color: Color): Float {
-        var r = color.red
-        var g = color.green
-        var b = color.blue
-
-        r = if (r <= 0.03928f) r / 12.92f else Math.pow(((r + 0.055f) / 1.055f).toDouble(), 2.4).toFloat()
-        g = if (g <= 0.03928f) g / 12.92f else Math.pow(((g + 0.055f) / 1.055f).toDouble(), 2.4).toFloat()
-        b = if (b <= 0.03928f) b / 12.92f else Math.pow(((b + 0.055f) / 1.055f).toDouble(), 2.4).toFloat()
-
-        return 0.2126f * r + 0.7152f * g + 0.0722f * b
-    }
 }

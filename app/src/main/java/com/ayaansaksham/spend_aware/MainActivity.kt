@@ -62,17 +62,25 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
 
                 NavHost(navController = navController, startDestination = Screen.Dashboard.route) {
+
+                    // --- UPDATED DASHBOARD ROUTE ---
                     composable(Screen.Dashboard.route) {
                         DashboardScreen(
-                            currentMonthTotal = expenseViewModel.currentMonthTotal,
-                            recentExpenses = expenseViewModel.allExpenses,
+                            // 1. Data streams for UI and Intelligence
+                            expenses = expenseViewModel.allExpenses,
+                            categories = categoryViewModel.allCategories,
+                            budgets = budgetViewModel.allBudgets,
+                            burnRates = budgetViewModel.burnRates,
+
+                            // 2. Navigation click listeners for the buttons
                             onAddExpenseClick = { navController.navigate(Screen.AddExpense.route) },
-                            onManageCategoriesClick = { navController.navigate(Screen.Categories.route) },
                             onViewHistoryClick = { navController.navigate(Screen.ExpenseHistory.route) },
                             onManageBudgetClick = { navController.navigate(Screen.Budget.route) },
+                            onManageCategoriesClick = { navController.navigate(Screen.Categories.route) },
                             onManageGoalsClick = { navController.navigate(Screen.SavingsGoals.route) }
                         )
                     }
+
                     composable(Screen.AddExpense.route) {
                         AddExpenseScreen(
                             categories = categoryViewModel.allCategories,
@@ -80,13 +88,18 @@ class MainActivity : ComponentActivity() {
                             onNavigateBack = { navController.popBackStack() }
                         )
                     }
+
                     composable(Screen.Categories.route) {
                         CategoryScreen(
                             categories = categoryViewModel.allCategories,
                             onAddCategory = { category -> categoryViewModel.addCategory(category) },
+                            // Add these two lines so the dropdown menu buttons actually trigger the database
+                            onUpdateCategory = { category -> categoryViewModel.updateCategory(category) },
+                            onDeleteCategory = { category -> categoryViewModel.deleteCategory(category) },
                             onNavigateBack = { navController.popBackStack() }
                         )
                     }
+
                     composable(Screen.ExpenseHistory.route) {
                         TransactionHistoryScreen(
                             expenses = expenseViewModel.allExpenses,
@@ -94,6 +107,7 @@ class MainActivity : ComponentActivity() {
                             onNavigateBack = { navController.popBackStack() }
                         )
                     }
+
                     composable(Screen.Budget.route) {
                         BudgetScreen(
                             budgets = budgetViewModel.allBudgets,
@@ -104,6 +118,7 @@ class MainActivity : ComponentActivity() {
                             onNavigateBack = { navController.popBackStack() }
                         )
                     }
+
                     composable(Screen.SavingsGoals.route) {
                         SavingsGoalScreen(
                             goals = savingsGoalViewModel.allGoals,
