@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
 
                 val budgetRepository = remember { BudgetRepository(database.budgetDao()) }
                 val budgetViewModel: BudgetViewModel = viewModel(
-                    factory = BudgetViewModelFactory(budgetRepository)
+                    factory = BudgetViewModelFactory(budgetRepository, expenseRepository)
                 )
 
                 val savingsGoalRepository = remember { SavingsGoalRepository(database.savingsGoalDao()) }
@@ -98,7 +98,9 @@ class MainActivity : ComponentActivity() {
                         BudgetScreen(
                             budgets = budgetViewModel.allBudgets,
                             categories = categoryViewModel.allCategories,
+                            burnRates = budgetViewModel.burnRates,
                             onSaveBudget = { budget -> budgetViewModel.addBudget(budget) },
+                            onRefreshBurnRates = { budgetViewModel.refreshBurnRates() },
                             onNavigateBack = { navController.popBackStack() }
                         )
                     }

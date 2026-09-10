@@ -29,8 +29,6 @@ class ExpenseRepository(private val expenseDao: ExpenseDao) {
         return expenseDao.getExpensesBetweenDates(startMillis, endMillis)
     }
 
-
-
     suspend fun getCurrentMonthTotal(): Double {
         val (startOfMonth, now) = getCurrentMonthRange()
         return expenseDao.getTotalSpentBetweenDates(startOfMonth, now) ?: 0.0
@@ -39,6 +37,20 @@ class ExpenseRepository(private val expenseDao: ExpenseDao) {
     suspend fun getCurrentMonthTotalForCategory(categoryId: Int): Double {
         val (startOfMonth, now) = getCurrentMonthRange()
         return expenseDao.getTotalSpentByCategoryBetweenDates(categoryId, startOfMonth, now) ?: 0.0
+    }
+
+    // --- Added for burn-rate: totals over an arbitrary period (not just "this month") ---
+
+    suspend fun getTotalSpentBetweenDates(startMillis: Long, endMillis: Long): Double {
+        return expenseDao.getTotalSpentBetweenDates(startMillis, endMillis) ?: 0.0
+    }
+
+    suspend fun getTotalSpentByCategoryBetweenDates(
+        categoryId: Int,
+        startMillis: Long,
+        endMillis: Long
+    ): Double {
+        return expenseDao.getTotalSpentByCategoryBetweenDates(categoryId, startMillis, endMillis) ?: 0.0
     }
 
     private fun getCurrentMonthRange(): Pair<Long, Long> {

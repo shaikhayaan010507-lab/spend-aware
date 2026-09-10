@@ -19,6 +19,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ayaansaksham.spend_aware.data.local.entity.Budget
 import com.ayaansaksham.spend_aware.data.local.entity.Category
+import com.ayaansaksham.spend_aware.domain.logic.BurnRateResult
+import com.ayaansaksham.spend_aware.domain.logic.BurnRateStatus
 import kotlinx.coroutines.flow.StateFlow
 import java.util.Locale
 
@@ -27,11 +29,18 @@ import java.util.Locale
 fun BudgetScreen(
     budgets: StateFlow<List<Budget>>,
     categories: StateFlow<List<Category>>,
+    burnRates: StateFlow<Map<Int?, BurnRateResult>>,
     onSaveBudget: (Budget) -> Unit,
+    onRefreshBurnRates: () -> Unit,
     onNavigateBack: () -> Unit
 ) {
     val budgetList by budgets.collectAsState()
     val categoryList by categories.collectAsState()
+    val burnRateMap by burnRates.collectAsState()
+
+    LaunchedEffect(Unit) {
+        onRefreshBurnRates()
+    }
 
     val overallBudget = remember(budgetList) { budgetList.find { it.categoryId == null } }
     val categoryBudgetMap = remember(budgetList) {
@@ -54,26 +63,38 @@ fun BudgetScreen(
         }
     ) { paddingValues ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(16.dp)
         ) {
             Text("Overall Monthly Budget", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(8.dp))
             Card(
-                modifier = Modifier.fillMaxWidth().clickable { editingOverall = true }
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { editingOverall = true }
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(20.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = if (overallBudget != null)
-                            "₹${String.format(Locale.getDefault(), "%.2f", overallBudget.limitAmount)}"
-                        else "Not set",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text("Tap to edit", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                Column(modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (overallBudget != null)
+                                "₹${String.format(Locale.getDefault(), "%.2f", overallBudget.limitAmount)}"
+                            else "Not set",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text("Tap to edit", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    }
+                    burnRateMap[null]?.let { result ->
+                        BurnRateSummary(result)
+                    }
                 }
             }
 
@@ -87,30 +108,44 @@ fun BudgetScreen(
                 LazyColumn {
                     items(categoryList) { category ->
                         val budget = categoryBudgetMap[category.categoryId]
-                        Row(
+                        val result = burnRateMap[category.categoryId]
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { showDialogForCategory = category }
-                                .padding(vertical = 12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                                .padding(vertical = 12.dp)
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(android.graphics.Color.parseColor(category.colorHex)))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    val parsedColor = try {
+                                        Color(android.graphics.Color.parseColor(category.colorHex))
+                                    } catch (e: Exception) {
+                                        Color.Gray
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clip(CircleShape)
+                                            .background(parsedColor)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(category.name)
+                                }
+                                Text(
+                                    text = if (budget != null)
+                                        "₹${String.format(Locale.getDefault(), "%.2f", budget.limitAmount)}"
+                                    else "Not set",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text(category.name)
                             }
-                            Text(
-                                text = if (budget != null)
-                                    "₹${String.format(Locale.getDefault(), "%.2f", budget.limitAmount)}"
-                                else "Not set",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            if (budget != null && result != null) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                BurnRateSummary(result)
+                            }
                         }
                         HorizontalDivider()
                     }
@@ -130,8 +165,8 @@ fun BudgetScreen(
                         budgetId = overallBudget?.budgetId ?: 0,
                         categoryId = null,
                         limitAmount = amount,
-                        periodType = "MONTHLY",
-                        startDateMillis = System.currentTimeMillis()
+                        periodType = overallBudget?.periodType ?: "MONTHLY",
+                        startDateMillis = overallBudget?.startDateMillis ?: System.currentTimeMillis()
                     )
                 )
                 editingOverall = false
@@ -151,13 +186,57 @@ fun BudgetScreen(
                         budgetId = existingBudget?.budgetId ?: 0,
                         categoryId = category.categoryId,
                         limitAmount = amount,
-                        periodType = "MONTHLY",
-                        startDateMillis = System.currentTimeMillis()
+                        periodType = existingBudget?.periodType ?: "MONTHLY",
+                        startDateMillis = existingBudget?.startDateMillis ?: System.currentTimeMillis()
                     )
                 )
                 showDialogForCategory = null
             }
         )
+    }
+}
+
+@Composable
+private fun BurnRateSummary(result: BurnRateResult) {
+    val statusColor = when (result.status) {
+        BurnRateStatus.UNDER_BUDGET -> Color(0xFF2E7D32)
+        BurnRateStatus.ON_TRACK -> Color(0xFF1565C0)
+        BurnRateStatus.AT_RISK -> Color(0xFFEF6C00)
+        BurnRateStatus.OVER_BUDGET -> Color(0xFFC62828)
+    }
+    val statusLabel = when (result.status) {
+        BurnRateStatus.UNDER_BUDGET -> "Under budget"
+        BurnRateStatus.ON_TRACK -> "On track"
+        BurnRateStatus.AT_RISK -> "At risk"
+        BurnRateStatus.OVER_BUDGET -> "Over budget"
+    }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        LinearProgressIndicator(
+            progress = { (result.percentageUsed / 100f).coerceIn(0f, 1f) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp),
+            color = statusColor,
+            trackColor = statusColor.copy(alpha = 0.15f)
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "$statusLabel · ${result.percentageUsed.toInt()}% used",
+                fontSize = 12.sp,
+                color = statusColor,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = "${result.daysRemaining}d left",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
