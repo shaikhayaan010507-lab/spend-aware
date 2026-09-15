@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.Flow
 
 class SavingsGoalRepository(private val savingsGoalDao: SavingsGoalDao) {
 
-    val allGoals: Flow<List<SavingsGoal>> = savingsGoalDao.getAllGoals()
+    fun getAllGoals(profileId: Int): Flow<List<SavingsGoal>> = savingsGoalDao.getAllGoals(profileId)
 
     suspend fun insertGoal(goal: SavingsGoal) {
         savingsGoalDao.insertGoal(goal)
@@ -18,9 +18,5 @@ class SavingsGoalRepository(private val savingsGoalDao: SavingsGoalDao) {
 
     suspend fun deleteGoal(goal: SavingsGoal) {
         savingsGoalDao.deleteGoal(goal)
-    }
-
-    suspend fun getGoalById(goalId: Int): SavingsGoal? {
-        return savingsGoalDao.getGoalById(goalId)
     }
 }

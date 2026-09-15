@@ -16,18 +16,18 @@ interface ExpenseDao {
     @Delete
     suspend fun deleteExpense(expense: Expense)
 
-    @Query("SELECT * FROM expenses ORDER BY dateMillis DESC")
-    fun getAllExpenses(): Flow<List<Expense>>
+    @Query("SELECT * FROM expenses WHERE profileId = :profileId ORDER BY dateMillis DESC")
+    fun getAllExpenses(profileId: Int): Flow<List<Expense>>
 
-    @Query("SELECT * FROM expenses WHERE categoryId = :categoryId ORDER BY dateMillis DESC")
-    fun getExpensesByCategory(categoryId: Int): Flow<List<Expense>>
+    @Query("SELECT * FROM expenses WHERE categoryId = :categoryId AND profileId = :profileId ORDER BY dateMillis DESC")
+    fun getExpensesByCategory(categoryId: Int, profileId: Int): Flow<List<Expense>>
 
-    @Query("SELECT * FROM expenses WHERE dateMillis BETWEEN :startMillis AND :endMillis ORDER BY dateMillis DESC")
-    fun getExpensesBetweenDates(startMillis: Long, endMillis: Long): Flow<List<Expense>>
+    @Query("SELECT * FROM expenses WHERE profileId = :profileId AND dateMillis BETWEEN :startMillis AND :endMillis ORDER BY dateMillis DESC")
+    fun getExpensesBetweenDates(startMillis: Long, endMillis: Long, profileId: Int): Flow<List<Expense>>
 
-    @Query("SELECT SUM(amount) FROM expenses WHERE dateMillis BETWEEN :startMillis AND :endMillis")
-    suspend fun getTotalSpentBetweenDates(startMillis: Long, endMillis: Long): Double?
+    @Query("SELECT SUM(amount) FROM expenses WHERE profileId = :profileId AND dateMillis BETWEEN :startMillis AND :endMillis")
+    suspend fun getTotalSpentBetweenDates(startMillis: Long, endMillis: Long, profileId: Int): Double?
 
-    @Query("SELECT SUM(amount) FROM expenses WHERE categoryId = :categoryId AND dateMillis BETWEEN :startMillis AND :endMillis")
-    suspend fun getTotalSpentByCategoryBetweenDates(categoryId: Int, startMillis: Long, endMillis: Long): Double?
+    @Query("SELECT SUM(amount) FROM expenses WHERE categoryId = :categoryId AND profileId = :profileId AND dateMillis BETWEEN :startMillis AND :endMillis")
+    suspend fun getTotalSpentByCategoryBetweenDates(categoryId: Int, startMillis: Long, endMillis: Long, profileId: Int): Double?
 }

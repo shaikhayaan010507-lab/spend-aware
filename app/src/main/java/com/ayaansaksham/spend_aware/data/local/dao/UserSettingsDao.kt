@@ -10,6 +10,6 @@ interface UserSettingsDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdateSettings(settings: UserSettings)
 
-    @Query("SELECT * FROM user_settings WHERE id = 0")
+    @Query("SELECT * FROM user_settings WHERE id = 1")
     fun getSettings(): Flow<UserSettings?>
 }

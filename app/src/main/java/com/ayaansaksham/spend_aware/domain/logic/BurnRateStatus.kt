@@ -85,12 +85,13 @@ object BurnRateCalculator {
 
         // Query the total spent using the full period end to prevent microsecond dropouts
         val amountSpent = if (budget.categoryId == null) {
-            expenseRepository.getTotalSpentBetweenDates(budget.startDateMillis, periodEndMillis)
+            expenseRepository.getTotalSpentBetweenDates(budget.startDateMillis, periodEndMillis, budget.profileId)
         } else {
             expenseRepository.getTotalSpentByCategoryBetweenDates(
                 budget.categoryId,
                 budget.startDateMillis,
-                periodEndMillis
+                periodEndMillis,
+                budget.profileId
             )
         }
 

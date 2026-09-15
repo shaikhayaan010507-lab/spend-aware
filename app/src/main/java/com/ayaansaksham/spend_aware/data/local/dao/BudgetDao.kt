@@ -16,12 +16,12 @@ interface BudgetDao {
     @Delete
     suspend fun deleteBudget(budget: Budget)
 
-    @Query("SELECT * FROM budgets")
-    fun getAllBudgets(): Flow<List<Budget>>
+    @Query("SELECT * FROM budgets WHERE profileId = :profileId")
+    fun getAllBudgets(profileId: Int): Flow<List<Budget>>
 
-    @Query("SELECT * FROM budgets WHERE categoryId IS NULL LIMIT 1")
-    suspend fun getOverallBudget(): Budget?
+    @Query("SELECT * FROM budgets WHERE categoryId IS NULL AND profileId = :profileId LIMIT 1")
+    suspend fun getOverallBudget(profileId: Int): Budget?
 
-    @Query("SELECT * FROM budgets WHERE categoryId = :categoryId LIMIT 1")
-    suspend fun getBudgetForCategory(categoryId: Int): Budget?
+    @Query("SELECT * FROM budgets WHERE categoryId = :categoryId AND profileId = :profileId LIMIT 1")
+    suspend fun getBudgetForCategory(categoryId: Int, profileId: Int): Budget?
 }

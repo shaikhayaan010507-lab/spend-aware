@@ -11,5 +11,6 @@ data class UserSettings(
     val isBiometricLockEnabled: Boolean = false,
     val pinHash: String? = null,
     val monthlyIncome: Double? = null,
-    val currencySymbol: String = "₹"
+    val currencySymbol: String = "₹",
+    val activeProfileId: Int = 1
 )

@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.Flow
 
 class CategoryRepository(private val categoryDao: CategoryDao) {
 
-    val allCategories: Flow<List<Category>> = categoryDao.getAllCategories()
+    fun getAllCategories(profileId: Int): Flow<List<Category>> = categoryDao.getAllCategories(profileId)
 
     suspend fun insertCategory(category: Category) {
         categoryDao.insertCategory(category)
@@ -20,7 +20,7 @@ class CategoryRepository(private val categoryDao: CategoryDao) {
         categoryDao.deleteCategory(category)
     }
 
-    suspend fun getCategoryById(categoryId: Int): Category? {
-        return categoryDao.getCategoryById(categoryId)
+    suspend fun getCategoryById(categoryId: Int, profileId: Int): Category? {
+        return categoryDao.getCategoryById(categoryId, profileId)
     }
 }

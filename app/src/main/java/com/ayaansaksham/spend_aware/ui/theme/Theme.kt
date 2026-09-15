@@ -1,6 +1,5 @@
 package com.ayaansaksham.spend_aware.ui.theme
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -12,32 +11,42 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = DbAccentDark,
+    secondary = DbOrangeAccent,
+    background = DbBackgroundDark,
+    surface = DbSurfaceDark,
+    onPrimary = DbBackgroundDark,
+    onSecondary = DbOrangeText,
+    onBackground = DbMainTextDark,
+    onSurface = DbMainTextDark,
+    outline = DbOutlineDark,
+    outlineVariant = DbSubduedDark,
+    error = DbErrorDark
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    primary = DbPrimaryTeal,
+    secondary = DbOrangeAccent,
+    background = DbBackgroundLight,
+    surface = DbSurfaceLight,
+    onPrimary = DbSurfaceLight,
+    onSecondary = DbOrangeText,
+    onBackground = DbMainTextLight,
+    onSurface = DbMainTextLight,
+    outline = DbInputOutlineLight,
+    outlineVariant = DbOutlineLight,
+    error = DbError,
+    errorContainer = DbErrorContainerLight,
+    primaryContainer = DbPaleTeal,
+    onPrimaryContainer = DbPrimaryTeal,
+    surfaceVariant = DbPaleBlue
 )
 
 @Composable
 fun SpendawareTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    // Keep dynamicColor false to strictly adhere to the DailyBudget design spec colors
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
@@ -45,7 +54,6 @@ fun SpendawareTheme(
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }

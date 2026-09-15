@@ -10,5 +10,6 @@ data class Category(
     val name: String,
     val icon: String? = null,
     val colorHex: String = "#6750A4",
-    val isDefault: Boolean = false
+    val isDefault: Boolean = false,
+    val profileId: Int = 1
 )

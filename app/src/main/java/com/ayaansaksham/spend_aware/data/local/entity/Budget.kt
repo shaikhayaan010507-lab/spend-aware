@@ -10,5 +10,7 @@ data class Budget(
     val categoryId: Int? = null,
     val limitAmount: Double,
     val periodType: String = "MONTHLY",
-    val startDateMillis: Long
+    val startDateMillis: Long,
+    val isFixed: Boolean = false,
+    val profileId: Int = 1
 )

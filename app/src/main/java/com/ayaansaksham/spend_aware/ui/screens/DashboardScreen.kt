@@ -1,373 +1,253 @@
 package com.ayaansaksham.spend_aware.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ayaansaksham.spend_aware.data.local.entity.Budget
-import com.ayaansaksham.spend_aware.data.local.entity.Category
 import com.ayaansaksham.spend_aware.data.local.entity.Expense
-import com.ayaansaksham.spend_aware.domain.logic.BurnRateResult
-import com.ayaansaksham.spend_aware.domain.logic.BurnRateStatus
-import com.ayaansaksham.spend_aware.domain.logic.FinancialHealthCalculator
-import com.ayaansaksham.spend_aware.domain.logic.SpendingBehaviorClassifier
 import kotlinx.coroutines.flow.StateFlow
-import java.util.Locale
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.YearMonth
+import java.time.format.DateTimeFormatter
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
-    expenses: StateFlow<List<Expense>>,
-    categories: StateFlow<List<Category>>,
-    budgets: StateFlow<List<Budget>>,
-    burnRates: StateFlow<Map<Int?, BurnRateResult>>,
-    // Restored Navigation Callbacks
-    onAddExpenseClick: () -> Unit,
-    onViewHistoryClick: () -> Unit,
-    onManageBudgetClick: () -> Unit,
-    onManageCategoriesClick: () -> Unit,
-    onManageGoalsClick: () -> Unit
+    userName: String = "Ayaan",
+    expenses: StateFlow<List<Expense>>? = null,
+    budgets: StateFlow<List<Budget>>? = null
 ) {
-    val allExpenses by expenses.collectAsState()
-    val allCategories by categories.collectAsState()
-    val allBudgets by budgets.collectAsState()
-    val calculatedBurnRates by burnRates.collectAsState()
+    val expenseList by (expenses ?: kotlinx.coroutines.flow.MutableStateFlow(emptyList())).collectAsState(initial = emptyList())
+    val budgetList by (budgets ?: kotlinx.coroutines.flow.MutableStateFlow(emptyList())).collectAsState(initial = emptyList())
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Dashboard", fontWeight = FontWeight.Bold) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
+    val today = LocalDate.now()
+    val daysInMonth = YearMonth.of(today.year, today.month).lengthOfMonth()
+    val daysRemaining = daysInMonth - today.dayOfMonth + 1
+    val dateFormatter = DateTimeFormatter.ofPattern("EEEE, MMM dd")
+    val todayString = today.format(dateFormatter)
+    val zoneId = ZoneId.systemDefault()
+
+    val totalMonthlyBudget = budgetList.filter { it.categoryId == null }.sumOf { it.limitAmount }
+    
+    // Determine Fixed Commitments
+    val fixedBudgets = budgetList.filter { it.isFixed }
+    val fixedCategoryIds = fixedBudgets.mapNotNull { it.categoryId }.toSet()
+    val totalFixedCommitments = fixedBudgets.sumOf { it.limitAmount }
+
+    // Date-filtered flexible expense totals (ignores fixed bills)
+    val flexibleExpensesThisMonth = expenseList.filter { expense ->
+        val expenseDate = Instant.ofEpochMilli(expense.dateMillis).atZone(zoneId).toLocalDate()
+        expenseDate.year == today.year && expenseDate.month == today.month && expense.categoryId !in fixedCategoryIds
+    }
+    val spentThisMonth = flexibleExpensesThisMonth.sumOf { it.amount }
+
+    val todayFlexibleExpenses = expenseList.filter { expense ->
+        val expenseDate = Instant.ofEpochMilli(expense.dateMillis).atZone(zoneId).toLocalDate()
+        expenseDate == today && expense.categoryId !in fixedCategoryIds
+    }
+    val spentToday = todayFlexibleExpenses.sumOf { it.amount }
+
+    // Math: Safe to Spend Pool = (Total Allowance - Fixed Commitments) - Spent Flexible Money
+    val flexibleBudget = (totalMonthlyBudget - totalFixedCommitments).coerceAtLeast(0.0)
+    val monthlyPool = (flexibleBudget - spentThisMonth).coerceAtLeast(0.0)
+    val dailyLimit = if (daysRemaining > 0) monthlyPool / daysRemaining else 0.0
+    val progress = if (dailyLimit > 0) (spentToday.toFloat() / dailyLimit.toFloat()).coerceIn(0f, 1f) else 0f
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF8F9FA))
+            .padding(horizontal = 16.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text(
+            text = "Good Afternoon, $userName 👋",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF1A1A1A)
+        )
+        Text(
+            text = todayString,
+            fontSize = 14.sp,
+            color = Color.Gray,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    text = "SAFE TO SPEND TODAY",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Gray,
+                    letterSpacing = 1.sp
                 )
-            )
-        },
-        // Modern Floating Action Button for Adding Expenses
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onAddExpenseClick,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = CircleShape
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Expense")
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "₹${dailyLimit.toInt()}",
+                    fontSize = 48.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color(0xFF1A1A1A)
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Spent: ₹${spentToday.toInt()}", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color(0xFF00796B))
+                    Text("Remaining: ₹${(dailyLimit - spentToday).toInt().coerceAtLeast(0)}", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.Gray)
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                val barColor = when {
+                    progress >= 1f -> Color(0xFFD32F2F)   // Red (Danger)
+                    progress >= 0.75f -> Color(0xFFF57C00) // Amber (Warning)
+                    else -> Color(0xFF00796B)             // Green (Safe)
+                }
+
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(12.dp)
+                        .clip(RoundedCornerShape(6.dp)),
+                    color = barColor,
+                    trackColor = Color(0xFFE0E0E0)
+                )
             }
         }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp)
-                .verticalScroll(rememberScrollState())
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Overall Monthly Budget",
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-
-            val overallBudget = allBudgets.find { it.categoryId == null }
-            val overallBurnRate = calculatedBurnRates[null]
-
-            if (overallBudget != null && overallBurnRate != null) {
-                BudgetCard(budget = overallBudget, burnRate = overallBurnRate)
-            } else {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                ) {
-                    Text(
-                        text = "No overall budget set.",
-                        modifier = Modifier.padding(16.dp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+            Card(
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Days left", fontSize = 12.sp, color = Color.Gray)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("$daysRemaining", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A1A1A))
                 }
             }
 
-            Spacer(modifier = Modifier.height(28.dp))
-
-            IntelligenceSection(
-                expenses = allExpenses,
-                categories = allCategories,
-                budgets = allBudgets,
-                burnRates = calculatedBurnRates
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // The New Quick Actions Row
-            Text(
-                text = "Quick Actions",
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+            Card(
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                QuickActionButton(icon = Icons.Default.List, label = "History", onClick = onViewHistoryClick)
-                QuickActionButton(icon = Icons.Default.DateRange, label = "Budgets", onClick = onManageBudgetClick)
-                QuickActionButton(icon = Icons.Default.Settings, label = "Categories", onClick = onManageCategoriesClick)
-                QuickActionButton(icon = Icons.Default.Star, label = "Goals", onClick = onManageGoalsClick)
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Remaining Allowance", fontSize = 12.sp, color = Color.Gray)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("₹${monthlyPool.toInt()}", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A1A1A))
+                }
             }
-
-            Spacer(modifier = Modifier.height(80.dp)) // Extra space so FAB doesn't block content
         }
-    }
-}
 
-// Reusable component for the tiny action buttons
-@Composable
-fun QuickActionButton(icon: ImageVector, label: String, onClick: () -> Unit) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(72.dp)
-    ) {
-        FilledIconButton(
-            onClick = onClick,
-            colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer
-            ),
-            modifier = Modifier.size(56.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = MaterialTheme.colorScheme.onSecondaryContainer
-            )
-        }
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(24.dp))
+
         Text(
-            text = label,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-    }
-}
-
-@Composable
-fun BudgetCard(budget: Budget, burnRate: BurnRateResult) {
-    val statusColor = when (burnRate.status) {
-        BurnRateStatus.UNDER_BUDGET -> Color(0xFF4CAF50)
-        BurnRateStatus.ON_TRACK -> MaterialTheme.colorScheme.primary
-        BurnRateStatus.AT_RISK -> Color(0xFFFF9800)
-        BurnRateStatus.OVER_BUDGET -> Color(0xFFF44336)
-    }
-
-    val statusText = when (burnRate.status) {
-        BurnRateStatus.UNDER_BUDGET -> "Under budget"
-        BurnRateStatus.ON_TRACK -> "On track"
-        BurnRateStatus.AT_RISK -> "At risk"
-        BurnRateStatus.OVER_BUDGET -> "Over budget"
-    }
-
-    val budgetLimit = budget.limitAmount
-    val amountSpent = burnRate.amountSpent
-
-    val percentageUsed = if (budgetLimit > 0) (amountSpent / budgetLimit) * 100 else 0.0
-    val progress = if (budgetLimit > 0) (amountSpent / budgetLimit).toFloat().coerceIn(0f, 1f) else 0f
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        )
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom
-            ) {
-                Text(
-                    text = "₹${String.format(Locale.getDefault(), "%.2f", budgetLimit)}",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 28.sp,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Tap to edit",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp)),
-                color = statusColor,
-                trackColor = statusColor.copy(alpha = 0.2f),
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "$statusText · ${percentageUsed.toInt()}% used",
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 14.sp,
-                    color = statusColor
-                )
-                Text(
-                    text = "${burnRate.daysRemaining}d left",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun IntelligenceSection(
-    expenses: List<Expense>,
-    categories: List<Category>,
-    budgets: List<Budget>,
-    burnRates: Map<Int?, BurnRateResult>
-) {
-    val healthScore = remember(expenses, budgets, burnRates) {
-        FinancialHealthCalculator.calculateScore(budgets, burnRates, expenses)
-    }
-
-    val behaviors = remember(expenses, categories) {
-        SpendingBehaviorClassifier.classify(expenses, categories)
-    }
-
-    Column(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Text(
-            text = "Financial Intelligence",
-            fontWeight = FontWeight.Bold,
+            text = "Quick Summary",
             fontSize = 18.sp,
-            color = MaterialTheme.colorScheme.onBackground
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF1A1A1A)
         )
+
         Spacer(modifier = Modifier.height(12.dp))
+        
+        val yesterday = today.minusDays(1)
+        val spentYesterday = expenseList.filter { expense ->
+            val expenseDate = Instant.ofEpochMilli(expense.dateMillis).atZone(zoneId).toLocalDate()
+            expenseDate == yesterday && expense.categoryId !in fixedCategoryIds
+        }.sumOf { it.amount }
+        
+        val diff = spentToday - spentYesterday
+        val comparisonMessage = when {
+            spentToday > spentYesterday -> "You've spent ₹${diff.toInt()} more than yesterday 📈"
+            spentToday < spentYesterday -> "You've spent ₹${(-diff).toInt()} less than yesterday 📉"
+            else -> "You've spent exactly the same as yesterday ➖"
+        }
+        val comparisonColor = when {
+            spentToday > spentYesterday -> Color(0xFFD32F2F) // Red (Bad)
+            spentToday < spentYesterday -> Color(0xFF00796B) // Green (Good)
+            else -> Color.Gray
+        }
 
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
-            )
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(68.dp)
-                        .clip(CircleShape)
-                        .background(
-                            when {
-                                healthScore.score >= 80 -> Color(0xFF4CAF50)
-                                healthScore.score >= 50 -> Color(0xFFFF9800)
-                                else -> Color(0xFFF44336)
-                            }
-                        ),
-                    contentAlignment = Alignment.Center
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "${healthScore.score}",
-                        color = Color.White,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 24.sp
-                    )
+                    Column {
+                        Text("Today's Spent", fontSize = 14.sp, color = Color.Gray)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("₹${spentToday.toInt()}", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = if (spentToday > dailyLimit) Color(0xFFD32F2F) else Color(0xFF00796B))
+                    }
+                    
+                    Box(modifier = Modifier.width(1.dp).height(40.dp).background(Color(0xFFE0E0E0)))
+
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("Yesterday", fontSize = 14.sp, color = Color.Gray)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("₹${spentYesterday.toInt()}", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A1A1A))
+                    }
                 }
 
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = Color(0xFFF0F4F8), thickness = 1.dp)
+                Spacer(modifier = Modifier.height(12.dp))
 
-                Column {
-                    Text(
-                        text = healthScore.rating,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = healthScore.summary,
-                        fontSize = 13.sp,
-                        lineHeight = 18.sp,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
-                    )
-                }
+                Text(
+                    text = comparisonMessage,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = comparisonColor,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
-
-        if (behaviors.isNotEmpty()) {
-            Text(
-                text = "Spending Profile",
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                behaviors.forEach { trait ->
-                    AssistChip(
-                        onClick = { },
-                        label = {
-                            Text(
-                                text = trait.title,
-                                fontWeight = FontWeight.Medium
-                            )
-                        },
-                        colors = AssistChipDefaults.assistChipColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        border = null,
-                        shape = RoundedCornerShape(8.dp)
-                    )
-                }
-            }
-        }
+        Spacer(modifier = Modifier.height(80.dp))
     }
 }

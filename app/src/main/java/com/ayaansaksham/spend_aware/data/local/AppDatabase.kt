@@ -25,9 +25,10 @@ import kotlinx.coroutines.launch
         Expense::class,
         Budget::class,
         SavingsGoal::class,
-        UserSettings::class
+        UserSettings::class,
+        com.ayaansaksham.spend_aware.data.local.entity.Profile::class
     ],
-    version = 1,
+    version = 4, // Bumping to 4 for Profiles
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -37,6 +38,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun budgetDao(): BudgetDao
     abstract fun savingsGoalDao(): SavingsGoalDao
     abstract fun userSettingsDao(): UserSettingsDao
+    abstract fun profileDao(): com.ayaansaksham.spend_aware.data.local.dao.ProfileDao
 
     companion object {
         @Volatile
@@ -49,26 +51,36 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "spend_aware_database"
                 )
+                    .fallbackToDestructiveMigration()
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
                             super.onCreate(db)
                             CoroutineScope(Dispatchers.IO).launch {
-                                val categoryDao = getDatabase(context).categoryDao()
-                                categoryDao.insertCategory(
-                                    Category(name = "Food", colorHex = "#FF9800", isDefault = true)
-                                )
-                                categoryDao.insertCategory(
-                                    Category(name = "Travel", colorHex = "#2196F3", isDefault = true)
-                                )
-                                categoryDao.insertCategory(
-                                    Category(name = "Bills", colorHex = "#F44336", isDefault = true)
-                                )
-                                categoryDao.insertCategory(
-                                    Category(name = "Shopping", colorHex = "#9C27B0", isDefault = true)
-                                )
-                                categoryDao.insertCategory(
-                                    Category(name = "Entertainment", colorHex = "#4CAF50", isDefault = true)
-                                )
+                                val dbInstance = getDatabase(context)
+                                val profileDao = dbInstance.profileDao()
+                                val categoryDao = dbInstance.categoryDao()
+                                val userSettingsDao = dbInstance.userSettingsDao()
+
+                                // Create UserSettings
+                                userSettingsDao.insertOrUpdateSettings(UserSettings(id = 1, firebaseUid = "local_only", activeProfileId = 1))
+
+                                // Create Profiles
+                                val p1 = com.ayaansaksham.spend_aware.data.local.entity.Profile(profileId = 1, name = "Ayaan", role = "STUDENT")
+                                val p2 = com.ayaansaksham.spend_aware.data.local.entity.Profile(profileId = 2, name = "John Doe", role = "EMPLOYEE")
+                                profileDao.insertProfile(p1)
+                                profileDao.insertProfile(p2)
+
+                                // Categories for Student (Profile 1)
+                                categoryDao.insertCategory(Category(name = "Canteen", colorHex = "#00685D", isDefault = true, profileId = 1))
+                                categoryDao.insertCategory(Category(name = "Commute", colorHex = "#F89C00", isDefault = true, profileId = 1))
+                                categoryDao.insertCategory(Category(name = "Stationery", colorHex = "#6D7A77", isDefault = true, profileId = 1))
+                                categoryDao.insertCategory(Category(name = "Events", colorHex = "#875200", isDefault = true, profileId = 1))
+
+                                // Categories for Employee (Profile 2)
+                                categoryDao.insertCategory(Category(name = "Groceries", colorHex = "#16A34A", isDefault = true, profileId = 2))
+                                categoryDao.insertCategory(Category(name = "Rent", colorHex = "#B02528", isDefault = true, profileId = 2))
+                                categoryDao.insertCategory(Category(name = "Fuel", colorHex = "#F89C00", isDefault = true, profileId = 2))
+                                categoryDao.insertCategory(Category(name = "Investments", colorHex = "#008376", isDefault = true, profileId = 2))
                             }
                         }
                     })

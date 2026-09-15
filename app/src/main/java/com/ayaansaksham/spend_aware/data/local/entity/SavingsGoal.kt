@@ -10,5 +10,6 @@ data class SavingsGoal(
     val title: String,
     val targetAmount: Double,
     val savedAmount: Double = 0.0,
-    val targetDateMillis: Long? = null
+    val targetDateMillis: Long? = null,
+    val profileId: Int = 1
 )

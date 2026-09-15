@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.Flow
 
 class BudgetRepository(private val budgetDao: BudgetDao) {
 
-    val allBudgets: Flow<List<Budget>> = budgetDao.getAllBudgets()
+    fun getAllBudgets(profileId: Int): Flow<List<Budget>> = budgetDao.getAllBudgets(profileId)
 
     suspend fun insertBudget(budget: Budget) {
         budgetDao.insertBudget(budget)
@@ -20,11 +20,11 @@ class BudgetRepository(private val budgetDao: BudgetDao) {
         budgetDao.deleteBudget(budget)
     }
 
-    suspend fun getOverallBudget(): Budget? {
-        return budgetDao.getOverallBudget()
+    suspend fun getOverallBudget(profileId: Int): Budget? {
+        return budgetDao.getOverallBudget(profileId)
     }
 
-    suspend fun getBudgetForCategory(categoryId: Int): Budget? {
-        return budgetDao.getBudgetForCategory(categoryId)
+    suspend fun getBudgetForCategory(categoryId: Int, profileId: Int): Budget? {
+        return budgetDao.getBudgetForCategory(categoryId, profileId)
     }
 }

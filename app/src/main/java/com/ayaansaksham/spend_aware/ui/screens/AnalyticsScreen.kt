@@ -15,7 +15,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -25,6 +24,10 @@ import androidx.compose.ui.unit.sp
 import com.ayaansaksham.spend_aware.data.local.entity.Category
 import com.ayaansaksham.spend_aware.data.local.entity.Expense
 import kotlinx.coroutines.flow.StateFlow
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.temporal.TemporalAdjusters
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -173,22 +176,22 @@ fun AnalyticsScreen(
                     }
                 }
 
-                // Trend Line Chart Section
+                // Spending By Day Bar Chart Section
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
-                        Text(text = "Spending Trend (Recent)", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(text = "SPENDING BY DAY", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
+                        Spacer(modifier = Modifier.height(24.dp))
 
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(180.dp)
                         ) {
-                            TrendLineChart(expenses = allExpenses)
+                            SpendingByDayBarChart(expenses = allExpenses)
                         }
                     }
                 }
@@ -229,60 +232,95 @@ fun DonutChart(
 }
 
 @Composable
-fun TrendLineChart(expenses: List<Expense>) {
-    val dailySpending = remember(expenses) {
-        expenses.groupBy { expense ->
-            val cal = Calendar.getInstance().apply {
-                timeInMillis = expense.dateMillis
-                set(Calendar.HOUR_OF_DAY, 0)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
+fun SpendingByDayBarChart(expenses: List<Expense>) {
+    val zoneId = ZoneId.systemDefault()
+    val today = LocalDate.now(zoneId)
+    // Find Monday of the current week
+    val startOfWeek = today.with(TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+
+    val weeklyExpenses = remember(expenses, startOfWeek) {
+        val totals = FloatArray(7) { 0f }
+        expenses.forEach { expense ->
+            val expenseDate = Instant.ofEpochMilli(expense.dateMillis).atZone(zoneId).toLocalDate()
+            if (!expenseDate.isBefore(startOfWeek) && expenseDate.isBefore(startOfWeek.plusDays(7))) {
+                val dayIndex = expenseDate.dayOfWeek.value - 1 // 0 (Mon) to 6 (Sun)
+                if (dayIndex in 0..6) {
+                    totals[dayIndex] += expense.amount.toFloat()
+                }
             }
-            cal.timeInMillis
-        }.mapValues { entry -> entry.value.sumOf { it.amount } }
-            .toList()
-            .sortedBy { it.first }
-            .takeLast(7)
+        }
+        totals
     }
 
-    val lineColor = MaterialTheme.colorScheme.primary
-    val pointColor = MaterialTheme.colorScheme.secondary
+    val maxAmount = weeklyExpenses.maxOrNull()?.coerceAtLeast(1f) ?: 1f
+    val daysOfWeek = listOf("M", "T", "W", "T", "F", "S", "S")
+    val currentDayIndex = today.dayOfWeek.value - 1
 
-    if (dailySpending.isEmpty()) return
-
-    val maxAmount = dailySpending.maxOfOrNull { it.second } ?: 1.0
-
-    Canvas(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(8.dp)
-    ) {
-        val width = size.width
-        val height = size.height
-        val stepX = if (dailySpending.size > 1) width / (dailySpending.size - 1) else width
-
-        val points = dailySpending.mapIndexed { index, entry ->
-            val x = index * stepX
-            val y = height - (entry.second / maxAmount * height * 0.8f).toFloat() - 10f
-            Offset(x, y)
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Grid Lines
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = 24.dp), // Space for text labels
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            repeat(4) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), thickness = 1.dp)
+            }
         }
 
-        for (i in 0 until points.size - 1) {
-            drawLine(
-                color = lineColor,
-                start = points[i],
-                end = points[i + 1],
-                strokeWidth = 6f
-            )
-        }
+        // Bars and Labels
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.Bottom
+        ) {
+            daysOfWeek.forEachIndexed { index, dayLabel ->
+                val amount = weeklyExpenses[index]
+                val heightFraction = if (maxAmount > 0f) amount / maxAmount else 0f
+                val isToday = index == currentDayIndex
 
-        points.forEach { point ->
-            drawCircle(
-                color = pointColor,
-                radius = 8f,
-                center = point
-            )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Bottom,
+                    modifier = Modifier.fillMaxHeight()
+                ) {
+                    // Bar
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(bottom = 8.dp),
+                        contentAlignment = Alignment.BottomCenter
+                    ) {
+                        if (heightFraction > 0f || isToday) {
+                            Box(
+                                modifier = Modifier
+                                    .width(28.dp)
+                                    .fillMaxHeight(heightFraction.coerceAtLeast(0.08f)) // Tiny min-height for today if 0
+                                    .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                                    .background(if (isToday) Color(0xFF00796B) else Color(0xFFDCE4E9))
+                            )
+                        }
+                    }
+                    // Label
+                    Text(
+                        text = dayLabel,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isToday) Color(0xFF00796B) else Color.Gray
+                    )
+                }
+            }
         }
+    }
+}
+
+// Add this safeParseColor function at the bottom
+fun safeParseColor(colorString: String?): Int? {
+    if (colorString.isNullOrEmpty()) return null
+    return try {
+        android.graphics.Color.parseColor(colorString)
+    } catch (_: IllegalArgumentException) {
+        null
     }
 }
