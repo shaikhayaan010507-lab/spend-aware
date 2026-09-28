@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -37,7 +38,8 @@ class ExpenseViewModel(
 
     fun addExpense(expense: Expense) {
         viewModelScope.launch {
-            repository.insertExpense(expense)
+            val currentProfileId = userSettingsRepository.settings.first()?.activeProfileId ?: 1
+            repository.insertExpense(expense.copy(profileId = currentProfileId))
         }
     }
 

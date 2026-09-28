@@ -28,7 +28,7 @@ import kotlinx.coroutines.launch
         UserSettings::class,
         com.ayaansaksham.spend_aware.data.local.entity.Profile::class
     ],
-    version = 4, // Bumping to 4 for Profiles
+    version = 6, // Bump to force destructive migration and wipe all presentation data
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -60,8 +60,9 @@ abstract class AppDatabase : RoomDatabase() {
                                 val profileDao = dbInstance.profileDao()
                                 val categoryDao = dbInstance.categoryDao()
                                 val userSettingsDao = dbInstance.userSettingsDao()
+                                val budgetDao = dbInstance.budgetDao()
 
-                                // Create UserSettings
+                                // Create UserSettings (Defaults to Profile 1)
                                 userSettingsDao.insertOrUpdateSettings(UserSettings(id = 1, firebaseUid = "local_only", activeProfileId = 1))
 
                                 // Create Profiles
@@ -70,17 +71,46 @@ abstract class AppDatabase : RoomDatabase() {
                                 profileDao.insertProfile(p1)
                                 profileDao.insertProfile(p2)
 
+                                // --- CATEGORIES ---
                                 // Categories for Student (Profile 1)
-                                categoryDao.insertCategory(Category(name = "Canteen", colorHex = "#00685D", isDefault = true, profileId = 1))
-                                categoryDao.insertCategory(Category(name = "Commute", colorHex = "#F89C00", isDefault = true, profileId = 1))
-                                categoryDao.insertCategory(Category(name = "Stationery", colorHex = "#6D7A77", isDefault = true, profileId = 1))
-                                categoryDao.insertCategory(Category(name = "Events", colorHex = "#875200", isDefault = true, profileId = 1))
+                                categoryDao.insertCategory(Category(categoryId = 1, name = "Canteen", colorHex = "#00685D", isDefault = true, profileId = 1))
+                                categoryDao.insertCategory(Category(categoryId = 2, name = "Commute", colorHex = "#F89C00", isDefault = true, profileId = 1))
+                                categoryDao.insertCategory(Category(categoryId = 3, name = "Stationery", colorHex = "#6D7A77", isDefault = true, profileId = 1))
+                                categoryDao.insertCategory(Category(categoryId = 4, name = "Events", colorHex = "#875200", isDefault = true, profileId = 1))
+                                categoryDao.insertCategory(Category(categoryId = 5, name = "Hostel Fees", colorHex = "#B02528", isDefault = true, profileId = 1))
 
                                 // Categories for Employee (Profile 2)
-                                categoryDao.insertCategory(Category(name = "Groceries", colorHex = "#16A34A", isDefault = true, profileId = 2))
-                                categoryDao.insertCategory(Category(name = "Rent", colorHex = "#B02528", isDefault = true, profileId = 2))
-                                categoryDao.insertCategory(Category(name = "Fuel", colorHex = "#F89C00", isDefault = true, profileId = 2))
-                                categoryDao.insertCategory(Category(name = "Investments", colorHex = "#008376", isDefault = true, profileId = 2))
+                                categoryDao.insertCategory(Category(categoryId = 6, name = "Groceries", colorHex = "#16A34A", isDefault = true, profileId = 2))
+                                categoryDao.insertCategory(Category(categoryId = 7, name = "Rent", colorHex = "#B02528", isDefault = true, profileId = 2))
+                                categoryDao.insertCategory(Category(categoryId = 8, name = "Fuel", colorHex = "#F89C00", isDefault = true, profileId = 2))
+                                categoryDao.insertCategory(Category(categoryId = 9, name = "Investments", colorHex = "#008376", isDefault = true, profileId = 2))
+                                categoryDao.insertCategory(Category(categoryId = 10, name = "Dining", colorHex = "#00685D", isDefault = true, profileId = 2))
+
+                                // --- HELPER DATES ---
+                                val startOfMonth = java.util.Calendar.getInstance().apply {
+                                    set(java.util.Calendar.DAY_OF_MONTH, 1)
+                                    set(java.util.Calendar.HOUR_OF_DAY, 0)
+                                    set(java.util.Calendar.MINUTE, 0)
+                                    set(java.util.Calendar.SECOND, 0)
+                                    set(java.util.Calendar.MILLISECOND, 0)
+                                }.timeInMillis
+
+                                // ==========================================
+                                // INJECT EMPTY BASELINE FOR PROFILE 1
+                                // ==========================================
+
+                                // 1. Master Budget (Allowance) - Initialize to 0 so the UI isn't broken
+                                budgetDao.insertBudget(Budget(limitAmount = 0.0, periodType = "MONTHLY", startDateMillis = startOfMonth, categoryId = null, profileId = 1))
+                                
+                                // ==========================================
+                                // INJECT EMPTY BASELINE FOR PROFILE 2
+                                // ==========================================
+
+                                // 1. Master Budget (Salary) - Initialize to 0
+                                budgetDao.insertBudget(Budget(limitAmount = 0.0, periodType = "MONTHLY", startDateMillis = startOfMonth, categoryId = null, profileId = 2))
+                                
+                                // We are deliberately NOT inserting any Expenses or Fixed Budgets
+                                // This provides a completely clean slate for the user to start tracking.
                             }
                         }
                     })

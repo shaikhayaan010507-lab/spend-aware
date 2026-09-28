@@ -18,7 +18,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.flow.first
+import androidx.compose.runtime.collectAsState
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -90,62 +93,6 @@ class MainActivity : ComponentActivity() {
 
                 // Only show bottom bar on main tabs (hide on SignUp and AddExpense)
                 val showBottomBar = bottomNavItems.any { it.route == currentRoute }
-
-                // --- DEMO DATA INJECTION ---
-                androidx.compose.runtime.LaunchedEffect(Unit) {
-                    val existingCategories = categoryViewModel.allCategories.first()
-                    if (existingCategories.isEmpty()) {
-                        // Insert Categories (DailyBudget Spec)
-                        val c1 = com.ayaansaksham.spend_aware.data.local.entity.Category(categoryId = 1, name = "Food", colorHex = "#00685D", isDefault = true)
-                        val c2 = com.ayaansaksham.spend_aware.data.local.entity.Category(categoryId = 2, name = "Transport", colorHex = "#F89C00", isDefault = true)
-                        val c3 = com.ayaansaksham.spend_aware.data.local.entity.Category(categoryId = 3, name = "Shopping", colorHex = "#6D7A77", isDefault = true)
-                        val c4 = com.ayaansaksham.spend_aware.data.local.entity.Category(categoryId = 4, name = "Entertainment", colorHex = "#875200", isDefault = true)
-                        val c5 = com.ayaansaksham.spend_aware.data.local.entity.Category(categoryId = 5, name = "Bills & Utilities", colorHex = "#B02528", isDefault = true)
-                        val c6 = com.ayaansaksham.spend_aware.data.local.entity.Category(categoryId = 6, name = "Health & Fitness", colorHex = "#008376", isDefault = true)
-                        val c7 = com.ayaansaksham.spend_aware.data.local.entity.Category(categoryId = 7, name = "Groceries", colorHex = "#16A34A", isDefault = true)
-                        val c8 = com.ayaansaksham.spend_aware.data.local.entity.Category(categoryId = 8, name = "Other", colorHex = "#64748B", isDefault = true)
-                        
-                        categoryViewModel.addCategory(c1)
-                        categoryViewModel.addCategory(c2)
-                        categoryViewModel.addCategory(c3)
-                        categoryViewModel.addCategory(c4)
-                        categoryViewModel.addCategory(c5)
-                        categoryViewModel.addCategory(c6)
-                        categoryViewModel.addCategory(c7)
-                        categoryViewModel.addCategory(c8)
-                        
-                        // Insert Master Budget
-                        val startOfMonth = java.util.Calendar.getInstance().apply {
-                            set(java.util.Calendar.DAY_OF_MONTH, 1)
-                            set(java.util.Calendar.HOUR_OF_DAY, 0)
-                            set(java.util.Calendar.MINUTE, 0)
-                            set(java.util.Calendar.SECOND, 0)
-                            set(java.util.Calendar.MILLISECOND, 0)
-                        }.timeInMillis
-                        
-                        budgetViewModel.addBudget(
-                            com.ayaansaksham.spend_aware.data.local.entity.Budget(
-                                limitAmount = 60000.0,
-                                periodType = "MONTHLY",
-                                startDateMillis = startOfMonth,
-                                categoryId = null
-                            )
-                        )
-                        
-                        // Insert Fixed Bills Budget
-                        budgetViewModel.addBudget(
-                            com.ayaansaksham.spend_aware.data.local.entity.Budget(
-                                limitAmount = 25000.0, // Fixed cost
-                                periodType = "MONTHLY",
-                                startDateMillis = startOfMonth,
-                                categoryId = 5, // Bills category
-                                isFixed = true
-                            )
-                        )
-                        
-                        // --- END OF DEMO DATA INJECTION ---
-                    }
-                }
 
                 Scaffold(
                     bottomBar = {
@@ -242,6 +189,8 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable(Screen.Budget.route) {
+                            val userSettings by userSettingsRepository.settings.collectAsState(initial = null)
+                            val activeProfileId = userSettings?.activeProfileId ?: 1
                             BudgetScreen(
                                 budgets = budgetViewModel.allBudgets,
                                 categories = categoryViewModel.allCategories,
@@ -249,7 +198,8 @@ class MainActivity : ComponentActivity() {
                                 onSaveBudget = { budget -> budgetViewModel.addBudget(budget) },
                                 onRefreshBurnRates = { budgetViewModel.refreshBurnRates() },
                                 onNavigateBack = { navController.popBackStack() },
-                                expenses = expenseViewModel.allExpenses
+                                expenses = expenseViewModel.allExpenses,
+                                currentProfileId = activeProfileId
                             )
                         }
 
@@ -263,7 +213,16 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable(Screen.Settings.route) {
-                            com.ayaansaksham.spend_aware.ui.screens.SettingsScreen()
+                            val userSettings by userSettingsRepository.settings.collectAsState(initial = null)
+                            com.ayaansaksham.spend_aware.ui.screens.SettingsScreen(
+                                currentProfileId = userSettings?.activeProfileId ?: 1,
+                                onProfileSelected = { newProfileId ->
+                                    val currentSettings = userSettings ?: com.ayaansaksham.spend_aware.data.local.entity.UserSettings(id = 1, firebaseUid = "local_only", activeProfileId = 1)
+                                    CoroutineScope(Dispatchers.IO).launch {
+                                        userSettingsRepository.saveSettings(currentSettings.copy(activeProfileId = newProfileId))
+                                    }
+                                }
+                            )
                         }
                     }
                 }

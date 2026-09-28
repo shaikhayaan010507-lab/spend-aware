@@ -19,16 +19,28 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    // We will wire these up to ViewModels when we do the full implementation.
-    // For now, setting up the exact UI structure.
+    currentProfileId: Int = 1,
+    onProfileSelected: (Int) -> Unit = {}
 ) {
     var showProfileSwitcher by remember { mutableStateOf(false) }
 
+    // Snackbar state for features that are coming soon
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    
+    val showNotImplemented = {
+        coroutineScope.launch {
+            snackbarHostState.showSnackbar("This feature is coming soon in V2!")
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Settings", fontWeight = FontWeight.SemiBold) },
@@ -73,14 +85,23 @@ fun SettingsScreen(
                                     .background(MaterialTheme.colorScheme.primaryContainer),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("A", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                if (currentProfileId == 1) {
+                                    Text("A", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                } else {
+                                    Text("J", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                }
                             }
                             Spacer(modifier = Modifier.width(16.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Ayaan", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-                                Text("Student Profile", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (currentProfileId == 1) {
+                                    Text("Ayaan", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                                    Text("Student Profile", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                } else {
+                                    Text("John Doe", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                                    Text("Employee Profile", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
                             }
-                            TextButton(onClick = { /* TODO Edit Profile */ }) {
+                            TextButton(onClick = { showNotImplemented() }) {
                                 Text("Edit")
                             }
                         }
@@ -98,7 +119,7 @@ fun SettingsScreen(
                             icon = Icons.Outlined.Payments,
                             title = "Currency",
                             value = "INR (₹)",
-                            onClick = { /* TODO */ }
+                            onClick = { showNotImplemented() }
                         )
                     }
                 }
@@ -107,6 +128,9 @@ fun SettingsScreen(
             // Budget Settings Section
             item {
                 SectionHeader("Budget Settings")
+                val incomeLabel = if (currentProfileId == 1) "Monthly Allowance" else "Income / Salary"
+                var rolloverChecked by remember { mutableStateOf(true) }
+                
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -114,18 +138,18 @@ fun SettingsScreen(
                     border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Column {
-                        SettingsRow(icon = Icons.Outlined.AccountBalanceWallet, title = "Income / Allowance", onClick = { /* TODO */ })
+                        SettingsRow(icon = Icons.Outlined.AccountBalanceWallet, title = incomeLabel, onClick = { showNotImplemented() })
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                        SettingsRow(icon = Icons.Outlined.Savings, title = "Savings Goal", onClick = { /* TODO */ })
+                        SettingsRow(icon = Icons.Outlined.Savings, title = "Savings Goal", onClick = { showNotImplemented() })
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                        SettingsRow(icon = Icons.Outlined.WarningAmber, title = "Alert Thresholds", value = "80%, 100%", onClick = { /* TODO */ })
+                        SettingsRow(icon = Icons.Outlined.WarningAmber, title = "Alert Thresholds", value = "80%, 100%", onClick = { showNotImplemented() })
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                         SettingsSwitchRow(
                             icon = Icons.Outlined.Loop,
                             title = "Rollover Unused Budget",
                             subtitle = "Redistribute remaining funds",
-                            checked = true,
-                            onCheckedChange = { /* TODO */ }
+                            checked = rolloverChecked,
+                            onCheckedChange = { rolloverChecked = it }
                         )
                     }
                 }
@@ -141,9 +165,9 @@ fun SettingsScreen(
                     border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Column {
-                        SettingsRow(icon = Icons.Outlined.Category, title = "Manage Categories", onClick = { /* TODO */ })
+                        SettingsRow(icon = Icons.Outlined.Category, title = "Manage Categories", onClick = { showNotImplemented() })
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                        SettingsRow(icon = Icons.Outlined.CreditCard, title = "Payment Methods", onClick = { /* TODO */ })
+                        SettingsRow(icon = Icons.Outlined.CreditCard, title = "Payment Methods", onClick = { showNotImplemented() })
                     }
                 }
             }
@@ -157,10 +181,23 @@ fun SettingsScreen(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
+                    var remindersChecked by remember { mutableStateOf(true) }
+                    var alertsChecked by remember { mutableStateOf(true) }
+                    
                     Column {
-                        SettingsSwitchRow(icon = Icons.Outlined.NotificationsActive, title = "Daily Reminders", checked = true, onCheckedChange = { /* TODO */ })
+                        SettingsSwitchRow(
+                            icon = Icons.Outlined.NotificationsActive, 
+                            title = "Daily Reminders", 
+                            checked = remindersChecked, 
+                            onCheckedChange = { remindersChecked = it }
+                        )
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                        SettingsSwitchRow(icon = Icons.Outlined.ErrorOutline, title = "Budget Alerts", checked = true, onCheckedChange = { /* TODO */ })
+                        SettingsSwitchRow(
+                            icon = Icons.Outlined.ErrorOutline, 
+                            title = "Budget Alerts", 
+                            checked = alertsChecked, 
+                            onCheckedChange = { alertsChecked = it }
+                        )
                     }
                 }
             }
@@ -175,17 +212,18 @@ fun SettingsScreen(
                     border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Column {
-                        SettingsRow(icon = Icons.Outlined.Download, title = "Export Data (CSV)", onClick = { /* TODO */ })
+                        SettingsRow(icon = Icons.Outlined.Download, title = "Export Data (CSV)", onClick = { showNotImplemented() })
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                        SettingsRow(icon = Icons.Outlined.UploadFile, title = "Import Data (JSON)", onClick = { /* TODO */ })
+                        SettingsRow(icon = Icons.Outlined.UploadFile, title = "Import Data (JSON)", onClick = { showNotImplemented() })
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                        SettingsRow(icon = Icons.Outlined.DarkMode, title = "Dark Mode", value = "System", onClick = { /* TODO */ })
+                        // Make Dark Mode functional
+                        SettingsRow(icon = Icons.Outlined.DarkMode, title = "Dark Mode", value = "System", onClick = { showNotImplemented() })
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                         SettingsRow(
                             icon = Icons.Outlined.DeleteForever,
                             title = "Reset Budget",
                             titleColor = MaterialTheme.colorScheme.error,
-                            onClick = { /* TODO */ },
+                            onClick = { showNotImplemented() },
                             showChevron = false
                         )
                     }
@@ -195,6 +233,8 @@ fun SettingsScreen(
             item { Spacer(modifier = Modifier.height(100.dp)) }
         }
     }
+
+    var activeProfileId by remember(currentProfileId) { mutableStateOf(currentProfileId) }
 
     if (showProfileSwitcher) {
         AlertDialog(
@@ -207,34 +247,46 @@ fun SettingsScreen(
                     
                     // Profile 1 Option
                     Card(
-                        modifier = Modifier.fillMaxWidth().clickable { /* TODO: Switch Profile logic */ },
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        modifier = Modifier.fillMaxWidth().clickable { 
+                            activeProfileId = 1
+                            onProfileSelected(1)
+                            showProfileSwitcher = false
+                        },
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (activeProfileId == 1) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                        )
                     ) {
                         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
-                                Text("A", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary), contentAlignment = Alignment.Center) {
+                                Text("A", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
                             }
                             Spacer(modifier = Modifier.width(16.dp))
                             Column {
-                                Text("Ayaan", fontWeight = FontWeight.Bold)
-                                Text("Student Profile", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Ayaan", fontWeight = FontWeight.Bold, color = if (activeProfileId == 1) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onBackground)
+                                Text("Student Profile", fontSize = 12.sp, color = if (activeProfileId == 1) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
 
                     // Profile 2 Option
                     Card(
-                        modifier = Modifier.fillMaxWidth().clickable { /* TODO: Switch Profile logic */ },
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        modifier = Modifier.fillMaxWidth().clickable { 
+                            activeProfileId = 2
+                            onProfileSelected(2)
+                            showProfileSwitcher = false
+                        },
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (activeProfileId == 2) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                        )
                     ) {
                         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer), contentAlignment = Alignment.Center) {
-                                Text("J", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                            Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondary), contentAlignment = Alignment.Center) {
+                                Text("J", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondary)
                             }
                             Spacer(modifier = Modifier.width(16.dp))
                             Column {
-                                Text("John Doe", fontWeight = FontWeight.Bold)
-                                Text("Employee Profile", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("John Doe", fontWeight = FontWeight.Bold, color = if (activeProfileId == 2) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onBackground)
+                                Text("Employee Profile", fontSize = 12.sp, color = if (activeProfileId == 2) MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }

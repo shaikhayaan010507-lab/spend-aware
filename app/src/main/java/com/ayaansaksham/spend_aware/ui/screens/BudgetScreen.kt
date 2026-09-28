@@ -15,7 +15,11 @@ import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.outlined.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,6 +31,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import com.ayaansaksham.spend_aware.data.local.entity.Budget
 import com.ayaansaksham.spend_aware.data.local.entity.Category
 import com.ayaansaksham.spend_aware.data.local.entity.Expense
@@ -48,7 +53,8 @@ fun BudgetScreen(
     onRefreshBurnRates: () -> Unit,
     onNavigateBack: () -> Unit,
     // Injecting expenses to calculate accurate spent/remaining exactly like Dashboard
-    expenses: StateFlow<List<Expense>>? = null 
+    expenses: StateFlow<List<Expense>>? = null,
+    currentProfileId: Int = 1
 ) {
     val budgetList by budgets.collectAsState()
     val categoryList by categories.collectAsState()
@@ -66,8 +72,9 @@ fun BudgetScreen(
     val totalFixed = fixedBudgets.sumOf { it.limitAmount }
     val fixedCategoryIds = fixedBudgets.mapNotNull { it.categoryId }.toSet()
     
-    // For savings goal, we are not passing it in right now, so we will stub it to 10000.0 if we don't have it for UI parity
-    val totalSavings = 10000.0 // To exactly match our demo data
+    // Using a local state to visually track savings target for the presentation
+    var displaySavingsTarget by remember { mutableStateOf(10000.0) }
+    val totalSavings = displaySavingsTarget
 
     val flexibleBudget = (totalIncome - totalFixed - totalSavings).coerceAtLeast(0.0)
     
@@ -82,8 +89,20 @@ fun BudgetScreen(
     val progress = if (flexibleBudget > 0) (spentThisMonth.toFloat() / flexibleBudget.toFloat()).coerceIn(0f, 1f) else 0f
 
     var showIncomeDialog by remember { mutableStateOf(false) }
+    var showFixedExpenseDialog by remember { mutableStateOf(false) }
+    var showSavingsGoalDialog by remember { mutableStateOf(false) }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    
+    val showNotImplemented = {
+        coroutineScope.launch {
+            snackbarHostState.showSnackbar("This feature is coming soon in V2!")
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Monthly Budget", fontWeight = FontWeight.SemiBold) },
@@ -114,14 +133,16 @@ fun BudgetScreen(
                     ) {
                         Column(modifier = Modifier.padding(20.dp)) {
                             // Metrics Grid
+                            val incomeLabel = if (currentProfileId == 1) "Allowance" else "Income"
+                            val fixedLabel = if (currentProfileId == 1) "Fixed Deductions" else "Fixed Expenses"
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text("Income", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(incomeLabel, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text("₹${totalIncome.toInt()}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
                                 }
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text("Fixed Expenses", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(fixedLabel, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text("₹${totalFixed.toInt()}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
                                 }
@@ -202,29 +223,38 @@ fun BudgetScreen(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                     ) {
+                        val incomeLabel = if (currentProfileId == 1) "Monthly Allowance" else "Monthly Income"
+                        val fixedLabel = if (currentProfileId == 1) "Locked Bills (Mess/Subs)" else "Fixed Expenses"
+                        val savingsLabel = if (currentProfileId == 1) "Wishlist Fund" else "Savings Goal"
+                        val rulesLabel = if (currentProfileId == 1) "Rollover Reward" else "Budget Rules"
+                        
                         Column {
                             ConfigRow(
-                                label = "Monthly Income",
+                                icon = Icons.Outlined.AccountBalanceWallet,
+                                label = incomeLabel,
                                 value = "₹${totalIncome.toInt()}",
                                 onClick = { showIncomeDialog = true }
                             )
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                             ConfigRow(
-                                label = "Fixed Expenses",
+                                icon = Icons.Outlined.Lock,
+                                label = fixedLabel,
                                 value = "₹${totalFixed.toInt()}",
-                                onClick = { /* TODO: Open fixed expense manager */ }
+                                onClick = { showFixedExpenseDialog = true }
                             )
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                             ConfigRow(
-                                label = "Savings Goal",
+                                icon = Icons.Outlined.Star,
+                                label = savingsLabel,
                                 value = "₹${totalSavings.toInt()}",
-                                onClick = { /* TODO: Open savings goal editor */ }
+                                onClick = { showSavingsGoalDialog = true }
                             )
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                             ConfigRow(
-                                label = "Budget Rules",
+                                icon = Icons.Default.TrendingUp,
+                                label = rulesLabel,
                                 value = "Rollover Unused",
-                                onClick = { /* TODO: Open rules editor */ }
+                                onClick = { showNotImplemented() }
                             )
                         }
                     }
@@ -234,7 +264,7 @@ fun BudgetScreen(
                 item {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Text("Fixed Commitments", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground)
-                        TextButton(onClick = { /* TODO */ }) {
+                        TextButton(onClick = { showNotImplemented() }) {
                             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Add")
@@ -315,10 +345,48 @@ fun BudgetScreen(
             }
         )
     }
+
+    if (showFixedExpenseDialog) {
+        // Since we are editing a general aggregate here (to quickly change total fixed expenses for demo purposes)
+        // We will just edit the primary fixed budget. If there isn't one, we'll create a placeholder.
+        val primaryFixedBudget = fixedBudgets.firstOrNull() 
+        BudgetAmountDialog(
+            title = "Total Fixed Expenses",
+            currentAmount = totalFixed,
+            onDismiss = { showFixedExpenseDialog = false },
+            onConfirm = { amount ->
+                // Updating the primary fixed budget to hold the new aggregate value for quick presentation adjustment
+                val updatedBudget = primaryFixedBudget?.copy(limitAmount = amount) ?: Budget(
+                    limitAmount = amount,
+                    periodType = "MONTHLY",
+                    startDateMillis = System.currentTimeMillis(),
+                    categoryId = 4, // Defaulting to some "Bills" category ID
+                    isFixed = true,
+                    profileId = masterBudget?.profileId ?: 1
+                )
+                onSaveBudget(updatedBudget)
+                showFixedExpenseDialog = false
+            }
+        )
+    }
+
+    if (showSavingsGoalDialog) {
+        val title = if (currentProfileId == 1) "Wishlist Target" else "Monthly Savings Target"
+        BudgetAmountDialog(
+            title = title,
+            currentAmount = totalSavings,
+            onDismiss = { showSavingsGoalDialog = false },
+            onConfirm = { amount ->
+                // Updating local state so the UI reacts instantly for the presentation
+                displaySavingsTarget = amount
+                showSavingsGoalDialog = false
+            }
+        )
+    }
 }
 
 @Composable
-fun ConfigRow(label: String, value: String, onClick: () -> Unit) {
+fun ConfigRow(icon: androidx.compose.ui.graphics.vector.ImageVector? = null, label: String, value: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -327,7 +395,13 @@ fun ConfigRow(label: String, value: String, onClick: () -> Unit) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, fontSize = 16.sp, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Medium)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (icon != null) {
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
+                Spacer(modifier = Modifier.width(12.dp))
+            }
+            Text(label, fontSize = 16.sp, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Medium)
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(value, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.width(8.dp))

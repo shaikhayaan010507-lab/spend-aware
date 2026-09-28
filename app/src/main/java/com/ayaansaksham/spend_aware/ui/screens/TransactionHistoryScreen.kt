@@ -59,6 +59,32 @@ fun TransactionHistoryScreen(
     // Toggle state: true = List View, false = Calendar View
     var isListView by remember { mutableStateOf(true) }
 
+    // Filter states
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedPeriod by remember { mutableStateOf("All Time") }
+    var selectedCategory by remember { mutableStateOf<Category?>(null) }
+
+    val zoneId = ZoneId.systemDefault()
+    val today = LocalDate.now(zoneId)
+
+    val filteredExpenses = remember(expenseList, searchQuery, selectedPeriod, selectedCategory) {
+        val currentCategory = selectedCategory
+        expenseList.filter { expense ->
+            val noteMatches = searchQuery.isBlank() || expense.note?.contains(searchQuery, ignoreCase = true) == true
+            val catMatches = currentCategory == null || expense.categoryId == currentCategory.categoryId
+            val date = Instant.ofEpochMilli(expense.dateMillis).atZone(zoneId).toLocalDate()
+            
+            val periodMatches = when (selectedPeriod) {
+                "Today" -> date == today
+                "Last 7 Days" -> !date.isBefore(today.minusDays(6)) && !date.isAfter(today)
+                "This Month" -> date.year == today.year && date.month == today.month
+                else -> true // "All Time"
+            }
+            
+            noteMatches && catMatches && periodMatches
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -116,11 +142,19 @@ fun TransactionHistoryScreen(
 
         // Main Content Area
         if (isListView) {
-            QuickStatsRow(expenseList, categoryList)
+            QuickStatsRow(filteredExpenses, categoryList)
             Spacer(modifier = Modifier.height(16.dp))
-            FiltersSection()
+            FiltersSection(
+                searchQuery = searchQuery,
+                onSearchChange = { searchQuery = it },
+                selectedPeriod = selectedPeriod,
+                onPeriodChange = { selectedPeriod = it },
+                categories = categoryList,
+                selectedCategory = selectedCategory,
+                onCategoryChange = { selectedCategory = it }
+            )
             Spacer(modifier = Modifier.height(16.dp))
-            ExpenseListView(expenseList, categoryList)
+            ExpenseListView(filteredExpenses, categoryList)
         } else {
             ExpenseCalendarView(expenseList, budgetList)
         }
@@ -169,14 +203,16 @@ fun StatCard(title: String, value: String, valueColor: Color) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FiltersSection() {
-    var searchQuery by remember { mutableStateOf("") }
+fun FiltersSection(
+    searchQuery: String,
+    onSearchChange: (String) -> Unit,
+    selectedPeriod: String,
+    onPeriodChange: (String) -> Unit,
+    categories: List<Category>,
+    selectedCategory: Category?,
+    onCategoryChange: (Category?) -> Unit
+) {
     val periods = listOf("All Time", "Today", "Last 7 Days", "This Month")
-    var selectedPeriod by remember { mutableStateOf(periods.first()) }
-    
-    // Categories placeholder for Chips
-    val categories = listOf("All Categories", "Food", "Transport", "Shopping")
-    var selectedCategory by remember { mutableStateOf(categories.first()) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -188,7 +224,7 @@ fun FiltersSection() {
             // Search Bar
             OutlinedTextField(
                 value = searchQuery,
-                onValueChange = { searchQuery = it },
+                onValueChange = onSearchChange,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
@@ -217,7 +253,7 @@ fun FiltersSection() {
                             modifier = Modifier
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(if (isSelected) Color(0xFF00695C) else Color.Transparent)
-                                .clickable { selectedPeriod = period }
+                                .clickable { onPeriodChange(period) }
                                 .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
                             Text(
@@ -234,24 +270,50 @@ fun FiltersSection() {
             Spacer(modifier = Modifier.height(12.dp))
 
             // Category Filter
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(categories) { cat ->
-                    val isSelected = cat == selectedCategory
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(if (isSelected) Color(0xFF1A1A1A) else Color(0xFFF8F9FA))
-                            .clickable { selectedCategory = cat }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            cat,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = if (isSelected) Color.White else Color.DarkGray
-                        )
+            if (categories.isNotEmpty()) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item {
+                        val isSelected = selectedCategory == null
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(if (isSelected) Color(0xFF1A1A1A) else Color(0xFFF8F9FA))
+                                .clickable { onCategoryChange(null) }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                "All Categories",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = if (isSelected) Color.White else Color.DarkGray
+                            )
+                        }
+                    }
+                    items(categories) { cat ->
+                        val isSelected = cat == selectedCategory
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(if (isSelected) Color(0xFF1A1A1A) else Color(0xFFF8F9FA))
+                                .clickable { onCategoryChange(cat) }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                cat.name,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = if (isSelected) Color.White else Color.DarkGray
+                            )
+                        }
                     }
                 }
+            } else {
+                 Text(
+                    "No Categories Available",
+                    fontSize = 12.sp,
+                    color = Color.Gray,
+                    modifier = Modifier.padding(start = 4.dp)
+                )
             }
         }
     }

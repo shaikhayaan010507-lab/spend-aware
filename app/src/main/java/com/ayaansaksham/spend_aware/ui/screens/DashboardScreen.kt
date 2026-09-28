@@ -93,15 +93,16 @@ fun DashboardScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
                     text = "SAFE TO SPEND TODAY",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Gray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     letterSpacing = 1.sp
                 )
 
@@ -111,7 +112,7 @@ fun DashboardScreen(
                     text = "₹${dailyLimit.toInt()}",
                     fontSize = 48.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFF1A1A1A)
+                    color = MaterialTheme.colorScheme.onBackground
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -120,16 +121,16 @@ fun DashboardScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Spent: ₹${spentToday.toInt()}", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color(0xFF00796B))
-                    Text("Remaining: ₹${(dailyLimit - spentToday).toInt().coerceAtLeast(0)}", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.Gray)
+                    Text("Spent: ₹${spentToday.toInt()}", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary)
+                    Text("Remaining: ₹${(dailyLimit - spentToday).toInt().coerceAtLeast(0)}", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
                 val barColor = when {
-                    progress >= 1f -> Color(0xFFD32F2F)   // Red (Danger)
-                    progress >= 0.75f -> Color(0xFFF57C00) // Amber (Warning)
-                    else -> Color(0xFF00796B)             // Green (Safe)
+                    progress >= 1f -> MaterialTheme.colorScheme.error   // Red (Danger)
+                    progress >= 0.75f -> MaterialTheme.colorScheme.secondary // Amber (Warning)
+                    else -> MaterialTheme.colorScheme.primary             // Green (Safe)
                 }
 
                 LinearProgressIndicator(
@@ -139,7 +140,7 @@ fun DashboardScreen(
                         .height(12.dp)
                         .clip(RoundedCornerShape(6.dp)),
                     color = barColor,
-                    trackColor = Color(0xFFE0E0E0)
+                    trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                 )
             }
         }
@@ -153,26 +154,28 @@ fun DashboardScreen(
             Card(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Days left", fontSize = 12.sp, color = Color.Gray)
+                    Text("Days left", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("$daysRemaining", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A1A1A))
+                    Text("$daysRemaining", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
                 }
             }
 
             Card(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Remaining Allowance", fontSize = 12.sp, color = Color.Gray)
+                    Text("Remaining Allowance", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("₹${monthlyPool.toInt()}", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A1A1A))
+                    Text("₹${monthlyPool.toInt()}", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
                 }
             }
         }
@@ -201,16 +204,17 @@ fun DashboardScreen(
             else -> "You've spent exactly the same as yesterday ➖"
         }
         val comparisonColor = when {
-            spentToday > spentYesterday -> Color(0xFFD32F2F) // Red (Bad)
-            spentToday < spentYesterday -> Color(0xFF00796B) // Green (Good)
-            else -> Color.Gray
+            spentToday > spentYesterday -> MaterialTheme.colorScheme.error // Red (Bad)
+            spentToday < spentYesterday -> MaterialTheme.colorScheme.primary // Teal (Good)
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
         }
 
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(
@@ -219,22 +223,22 @@ fun DashboardScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text("Today's Spent", fontSize = 14.sp, color = Color.Gray)
+                        Text("Today's Spent", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text("₹${spentToday.toInt()}", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = if (spentToday > dailyLimit) Color(0xFFD32F2F) else Color(0xFF00796B))
+                        Text("₹${spentToday.toInt()}", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = if (spentToday > dailyLimit) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
                     }
                     
-                    Box(modifier = Modifier.width(1.dp).height(40.dp).background(Color(0xFFE0E0E0)))
+                    Box(modifier = Modifier.width(1.dp).height(40.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)))
 
                     Column(horizontalAlignment = Alignment.End) {
-                        Text("Yesterday", fontSize = 14.sp, color = Color.Gray)
+                        Text("Yesterday", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text("₹${spentYesterday.toInt()}", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A1A1A))
+                        Text("₹${spentYesterday.toInt()}", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
                     }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = Color(0xFFF0F4F8), thickness = 1.dp)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), thickness = 1.dp)
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(

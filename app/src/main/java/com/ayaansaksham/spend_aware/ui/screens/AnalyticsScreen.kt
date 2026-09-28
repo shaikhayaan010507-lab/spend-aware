@@ -100,30 +100,70 @@ fun AnalyticsScreen(
                 // Overview Card
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
-                        Text(text = "Total Tracked Outflow", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(text = "TOTAL TRACKED OUTFLOW", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "₹${String.format(Locale.getDefault(), "%.2f", totalSpent)}",
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.Bold,
+                            text = "₹${totalSpent.toInt()}",
+                            fontSize = 32.sp,
+                            fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.primary
                         )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                val sortedCategories = categorySpending.toList().sortedByDescending { it.second }
+                val topCategory = sortedCategories.firstOrNull()
+                val topCatName = topCategory?.first?.let { categoryMap[it]?.name } ?: "None"
+                val topCatAmount = topCategory?.second ?: 0.0
+                val topCatPercentage = if (totalSpent > 0) (topCatAmount / totalSpent * 100).toFloat() else 0f
+                val topCatColorInt = topCategory?.first?.let { categoryMap[it]?.colorHex }?.let { safeParseColor(it) }
+                val topCatColor = if (topCatColorInt != null) Color(topCatColorInt) else MaterialTheme.colorScheme.primary
+
+                // Top Category Card
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(text = "TOP CATEGORY", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(modifier = Modifier.size(16.dp).clip(CircleShape).background(topCatColor))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(text = topCatName, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text("₹${topCatAmount.toInt()}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                                Text("${topCatPercentage.toInt()}% of total", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
                     }
                 }
 
                 // Category Breakdown Donut Chart Section
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
-                        Text(text = "Category Breakdown", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        Spacer(modifier = Modifier.height(20.dp))
+                        Text(text = "CATEGORY BREAKDOWN", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
+                        Spacer(modifier = Modifier.height(24.dp))
 
                         Box(
                             modifier = Modifier
@@ -141,7 +181,7 @@ fun AnalyticsScreen(
                         Spacer(modifier = Modifier.height(20.dp))
 
                         // Legend
-                        categorySpending.forEach { (catId, amount) ->
+                        sortedCategories.forEach { (catId, amount) ->
                             val category = catId?.let { categoryMap[it] }
                             val catName = category?.name ?: "Uncategorized"
                             val colorInt = safeParseColor(category?.colorHex)
@@ -151,7 +191,7 @@ fun AnalyticsScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
+                                    .padding(vertical = 8.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -162,15 +202,22 @@ fun AnalyticsScreen(
                                             .clip(CircleShape)
                                             .background(catColor)
                                     )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(text = catName, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(text = catName, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onBackground)
                                 }
-                                Text(
-                                    text = "₹${String.format(Locale.getDefault(), "%.2f", amount)} (${String.format(Locale.getDefault(), "%.1f", percentage)}%)",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = "₹${String.format(Locale.getDefault(), "%.0f", amount)}",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onBackground
+                                    )
+                                    Text(
+                                        text = "${String.format(Locale.getDefault(), "%.1f", percentage)}%",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }
@@ -179,11 +226,12 @@ fun AnalyticsScreen(
                 // Spending By Day Bar Chart Section
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
-                        Text(text = "SPENDING BY DAY", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
+                        Text(text = "SPENDING BY DAY", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
                         Spacer(modifier = Modifier.height(24.dp))
 
                         Box(
