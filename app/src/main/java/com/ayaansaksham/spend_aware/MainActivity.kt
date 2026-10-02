@@ -18,7 +18,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.collectAsState
+import com.ayaansaksham.spend_aware.data.repository.dataStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -63,6 +65,10 @@ class MainActivity : ComponentActivity() {
                 val database = remember { AppDatabase.getDatabase(applicationContext) }
 
                 val userSettingsRepository = remember { com.ayaansaksham.spend_aware.data.repository.UserSettingsRepository(database.userSettingsDao()) }
+                val userPreferencesRepository = remember { com.ayaansaksham.spend_aware.data.repository.UserPreferencesRepository(applicationContext.dataStore) }
+
+                val splashViewModel: com.ayaansaksham.spend_aware.viewmodel.SplashViewModel = viewModel(factory = com.ayaansaksham.spend_aware.viewmodel.SplashViewModelFactory(userPreferencesRepository))
+                val splashState by splashViewModel.splashState.collectAsState()
 
                 val expenseRepository = remember { ExpenseRepository(database.expenseDao()) }
                 val expenseViewModel: ExpenseViewModel = viewModel(factory = ExpenseViewModelFactory(expenseRepository, userSettingsRepository))
@@ -94,7 +100,12 @@ class MainActivity : ComponentActivity() {
                 // Only show bottom bar on main tabs (hide on SignUp and AddExpense)
                 val showBottomBar = bottomNavItems.any { it.route == currentRoute }
 
-                Scaffold(
+                if (splashState is com.ayaansaksham.spend_aware.viewmodel.SplashState.Loading) {
+                    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                        // Empty loading screen
+                    }
+                } else {
+                    Scaffold(
                     bottomBar = {
                         if (showBottomBar) {
                             NavigationBar(tonalElevation = 8.dp) {
@@ -131,9 +142,19 @@ class MainActivity : ComponentActivity() {
 
                     NavHost(
                         navController = navController,
-                        startDestination = Screen.Dashboard.route,
+                        startDestination = if (splashState is com.ayaansaksham.spend_aware.viewmodel.SplashState.NeedsSetup) Screen.ProfileSetup.route else Screen.Dashboard.route,
                         modifier = Modifier.padding(innerPadding) // This prevents content from hiding behind the bottom bar
                     ) {
+                        composable(Screen.ProfileSetup.route) {
+                            com.ayaansaksham.spend_aware.ui.screens.ProfileSetupScreen(
+                                onSaveName = { name -> splashViewModel.saveUserName(name) },
+                                onNameSaved = {
+                                    navController.navigate(Screen.Dashboard.route) {
+                                        popUpTo(Screen.ProfileSetup.route) { inclusive = true }
+                                    }
+                                }
+                            )
+                        }
                         composable(Screen.SignUp.route) {
                             SignUpScreen(
                                 onSignUpSuccess = {
@@ -162,9 +183,19 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable(Screen.AddExpense.route) {
+                            val userSettings by userSettingsRepository.settings.collectAsState(initial = null)
+                            val activeProfileId = userSettings?.activeProfileId ?: 1
+
                             AddExpenseScreen(
                                 categories = categoryViewModel.allCategories,
+                                budgets = budgetViewModel.allBudgets,
+                                expenses = expenseViewModel.allExpenses,
+                                currentProfileId = activeProfileId,
                                 onSaveExpense = { expense -> expenseViewModel.addExpense(expense) },
+                                onAddCategory = { category -> categoryViewModel.addCategory(category) },
+                                onCheckAnomaly = { expense, dailyLimit, catName ->
+                                    expenseViewModel.checkAnomaly(expense, dailyLimit, catName)
+                                },
                                 onNavigateBack = { navController.popBackStack() }
                             )
                         }
@@ -184,6 +215,7 @@ class MainActivity : ComponentActivity() {
                                 expenses = expenseViewModel.allExpenses,
                                 categories = categoryViewModel.allCategories,
                                 budgets = budgetViewModel.allBudgets,
+                                onDeleteExpense = { expense -> expenseViewModel.deleteExpense(expense) },
                                 onNavigateBack = { navController.popBackStack() }
                             )
                         }
@@ -225,6 +257,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     }
+                }
                 }
             }
         }

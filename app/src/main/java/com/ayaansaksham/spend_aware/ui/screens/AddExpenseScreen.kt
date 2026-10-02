@@ -1,5 +1,6 @@
 package com.ayaansaksham.spend_aware.ui.screens
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,19 +17,14 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material.icons.outlined.CalendarToday
-import androidx.compose.material.icons.outlined.DirectionsCar
-import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material.icons.outlined.LocalGroceryStore
-import androidx.compose.material.icons.outlined.MoreHoriz
-import androidx.compose.material.icons.outlined.Receipt
-import androidx.compose.material.icons.outlined.Restaurant
-import androidx.compose.material.icons.outlined.ShoppingBag
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -40,22 +36,33 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ayaansaksham.spend_aware.data.local.entity.Category
 import com.ayaansaksham.spend_aware.data.local.entity.Expense
+import com.ayaansaksham.spend_aware.domain.logic.RealTimeAnomalyResult
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.StateFlow
 import java.time.Instant
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddExpenseScreen(
     categories: StateFlow<List<Category>>,
+    budgets: StateFlow<List<com.ayaansaksham.spend_aware.data.local.entity.Budget>>? = null,
+    expenses: StateFlow<List<Expense>>? = null,
+    currentProfileId: Int = 1,
     onSaveExpense: (Expense) -> Unit,
+    onAddCategory: (Category) -> Unit = {},
+    onCheckAnomaly: suspend (Expense, Double, String) -> RealTimeAnomalyResult = { _, _, _ -> RealTimeAnomalyResult.None },
     onNavigateBack: () -> Unit,
     initialDateMillis: Long = System.currentTimeMillis()
 ) {
     val categoryList by categories.collectAsState()
+    val budgetList by (budgets ?: kotlinx.coroutines.flow.MutableStateFlow(emptyList())).collectAsState()
+    val expenseList by (expenses ?: kotlinx.coroutines.flow.MutableStateFlow(emptyList())).collectAsState()
+
     val focusManager = LocalFocusManager.current
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -65,6 +72,39 @@ fun AddExpenseScreen(
     var selectedCategoryId by rememberSaveable { mutableStateOf<Int?>(null) }
     var selectedDateMillis by rememberSaveable { mutableStateOf(initialDateMillis) }
     var showDatePicker by remember { mutableStateOf(false) }
+
+    var showAddCategorySheet by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState()
+    
+    var newCategoryName by remember { mutableStateOf("") }
+    val defaultColors = listOf("#00685D", "#F89C00", "#6D7A77", "#875200", "#B02528", "#16A34A", "#1976D2", "#9C27B0")
+    var selectedNewCategoryColor by remember { mutableStateOf(defaultColors[0]) }
+
+    var pendingExpense by remember { mutableStateOf<Expense?>(null) }
+    var anomalyResult by remember { mutableStateOf<RealTimeAnomalyResult?>(null) }
+
+    // Calculate Safe to Spend Today
+    val zoneId = ZoneId.systemDefault()
+    val today = LocalDate.now(zoneId)
+    val daysInMonth = YearMonth.of(today.year, today.month).lengthOfMonth()
+    val daysRemaining = daysInMonth - today.dayOfMonth + 1
+
+    val masterBudget = remember(budgetList) { budgetList.find { it.categoryId == null } }
+    val fixedBudgets = remember(budgetList) { budgetList.filter { it.isFixed } }
+    val totalIncome = masterBudget?.limitAmount ?: 0.0
+    val totalFixed = fixedBudgets.sumOf { it.limitAmount }
+    val fixedCategoryIds = fixedBudgets.mapNotNull { it.categoryId }.toSet()
+
+    val flexibleExpensesThisMonth = expenseList.filter { expense ->
+        val expenseDate = Instant.ofEpochMilli(expense.dateMillis).atZone(zoneId).toLocalDate()
+        expenseDate.year == today.year && expenseDate.month == today.month && expense.categoryId !in fixedCategoryIds
+    }
+    val spentThisMonth = flexibleExpensesThisMonth.sumOf { it.amount }
+    
+    // UI default savings goal (0.0) used here to match dashboard behavior
+    val flexibleBudget = (totalIncome - totalFixed - 0.0).coerceAtLeast(0.0)
+    val monthlyPool = (flexibleBudget - spentThisMonth).coerceAtLeast(0.0)
+    val dailyLimit = if (daysRemaining > 0) monthlyPool / daysRemaining else 0.0
 
     // Payment method state
     val paymentMethods = listOf("UPI / Google Pay", "Credit Card", "Debit Card", "Cash", "Net Banking")
@@ -214,6 +254,9 @@ fun AddExpenseScreen(
                             onClick = { selectedCategoryId = category.categoryId }
                         )
                     }
+                    item {
+                        AddCategoryGridItem(onClick = { showAddCategorySheet = true })
+                    }
                 }
             }
 
@@ -339,19 +382,23 @@ fun AddExpenseScreen(
                             amount = amount,
                             categoryId = selectedCategoryId,
                             note = note.trim().ifEmpty { null },
-                            dateMillis = selectedDateMillis
-                            // Note: We might want to save Payment Method to entity in the future, 
-                            // but current entity does not have a field for it yet. 
-                            // It's in the spec to keep historical references, so we will add it to the entity later if needed.
+                            dateMillis = selectedDateMillis,
+                            profileId = currentProfileId
                         )
-                        onSaveExpense(expense)
-
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Expense saved successfully")
-                        }
                         
-                        // Close sheet/screen
-                        onNavigateBack()
+                        coroutineScope.launch {
+                            val categoryName = categoryList.find { it.categoryId == selectedCategoryId }?.name ?: "Unknown"
+                            val anomaly = onCheckAnomaly(expense, dailyLimit, categoryName)
+                            
+                            if (anomaly is RealTimeAnomalyResult.None) {
+                                onSaveExpense(expense)
+                                snackbarHostState.showSnackbar("Expense saved successfully")
+                                onNavigateBack()
+                            } else {
+                                pendingExpense = expense
+                                anomalyResult = anomaly
+                            }
+                        }
                     }
                 },
                 modifier = Modifier
@@ -362,7 +409,9 @@ fun AddExpenseScreen(
                 enabled = isValid,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
-                    disabledContainerColor = MaterialTheme.colorScheme.outlineVariant
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    disabledContainerColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             ) {
                 Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(20.dp))
@@ -390,6 +439,131 @@ fun AddExpenseScreen(
             DatePicker(state = datePickerState)
         }
     }
+    
+    // Add Category Bottom Sheet
+    if (showAddCategorySheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showAddCategorySheet = false },
+            sheetState = sheetState
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+                    .padding(bottom = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("New Category", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                OutlinedTextField(
+                    value = newCategoryName,
+                    onValueChange = { newCategoryName = it },
+                    label = { Text("Category Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Text("Select Color Tag", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.align(Alignment.Start))
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    defaultColors.forEach { hexColor ->
+                        val color = try { Color(android.graphics.Color.parseColor(hexColor)) } catch (e: Exception) { Color.Gray }
+                        val isColorSelected = selectedNewCategoryColor == hexColor
+                        
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(color)
+                                .clickable { selectedNewCategoryColor = hexColor }
+                                .border(
+                                    width = if (isColorSelected) 3.dp else 0.dp,
+                                    color = if (isColorSelected) MaterialTheme.colorScheme.onBackground else Color.Transparent,
+                                    shape = CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isColorSelected) {
+                                Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                            }
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(32.dp))
+                
+                Button(
+                    onClick = {
+                        if (newCategoryName.isNotBlank()) {
+                            onAddCategory(
+                                Category(
+                                    name = newCategoryName.trim(),
+                                    colorHex = selectedNewCategoryColor,
+                                    profileId = currentProfileId,
+                                    isDefault = false
+                                )
+                            )
+                            newCategoryName = ""
+                            coroutineScope.launch {
+                                sheetState.hide()
+                                showAddCategorySheet = false
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = newCategoryName.isNotBlank()
+                ) {
+                    Text("Save Category", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+
+    // Anomaly Alert Dialog
+    anomalyResult?.let { anomaly ->
+        AlertDialog(
+            onDismissRequest = { anomalyResult = null },
+            title = { Text("Large Expense Alert", fontWeight = FontWeight.Bold) },
+            text = {
+                val message = when (anomaly) {
+                    is RealTimeAnomalyResult.LargePercentage -> {
+                        "This expense is ₹${anomaly.amount.toInt()}, ${anomaly.percentage.toInt()}% of today's Safe to Spend limit. Save anyway?"
+                    }
+                    is RealTimeAnomalyResult.Outlier -> {
+                        "This is ${String.format(Locale.getDefault(), "%.1fx", anomaly.multiplier)} your usual spending in ${anomaly.categoryName} (normal range: ₹${anomaly.normalMin.toInt()}–₹${anomaly.normalMax.toInt()}). Save anyway?"
+                    }
+                    else -> ""
+                }
+                Text(message)
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingExpense?.let { onSaveExpense(it) }
+                    anomalyResult = null
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar("Expense saved successfully")
+                        onNavigateBack()
+                    }
+                }) {
+                    Text("Save Anyway")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { anomalyResult = null }) {
+                    Text("Edit")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -410,9 +584,19 @@ fun CategoryGridItem(
     val outlineColor = if (isSelected) parsedColor else Color.Transparent
     val backgroundColor = if (isSelected) parsedColor.copy(alpha = 0.1f) else Color.Transparent
 
+    val scale by animateFloatAsState(
+        targetValue = if (isSelected) 1.1f else 1.0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "CategoryScaleAnim"
+    )
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
+            .scale(scale)
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
             .border(
@@ -454,15 +638,54 @@ fun CategoryGridItem(
     }
 }
 
+@Composable
+fun AddCategoryGridItem(onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Add,
+                contentDescription = "Add New",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "Add New",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
 // Temporary helper until we extract a shared icon mapping object
 fun getIconForCategoryName(name: String): androidx.compose.ui.graphics.vector.ImageVector {
     return when (name.lowercase()) {
-        "food", "dining" -> Icons.Outlined.Restaurant
-        "transport" -> Icons.Outlined.DirectionsCar
-        "shopping" -> Icons.Outlined.ShoppingBag
-        "bills", "bills & utilities" -> Icons.Outlined.Receipt
-        "health & fitness" -> Icons.Outlined.FavoriteBorder
-        "groceries" -> Icons.Outlined.LocalGroceryStore
-        else -> Icons.Outlined.MoreHoriz
+        "food", "dining", "canteen" -> Icons.Rounded.Fastfood
+        "transport", "commute" -> Icons.Rounded.DirectionsBus
+        "shopping" -> Icons.Rounded.ShoppingBag
+        "bills", "bills & utilities", "rent", "hostel fees" -> Icons.Rounded.Receipt
+        "health & fitness" -> Icons.Rounded.FavoriteBorder
+        "groceries" -> Icons.Rounded.LocalGroceryStore
+        "stationery" -> Icons.Rounded.Edit
+        "events" -> Icons.Rounded.Event
+        "investments" -> Icons.Rounded.TrendingUp
+        else -> Icons.Rounded.MoreHoriz
     }
 }

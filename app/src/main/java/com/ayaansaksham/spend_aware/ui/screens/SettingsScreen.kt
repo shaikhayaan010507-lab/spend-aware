@@ -61,66 +61,25 @@ fun SettingsScreen(
         ) {
             item { Spacer(modifier = Modifier.height(8.dp)) }
 
-            // Account & Profile Section
             item {
-                SectionHeader("Account & Profile")
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
-                    Column {
-                        // Current Profile Header
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            modifier = Modifier.size(72.dp).clip(CircleShape).background(Color(0xFF6750A4)), // Purple
+                            contentAlignment = Alignment.Center
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (currentProfileId == 1) {
-                                    Text("A", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                                } else {
-                                    Text("J", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                if (currentProfileId == 1) {
-                                    Text("Ayaan", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-                                    Text("Student Profile", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                } else {
-                                    Text("John Doe", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-                                    Text("Employee Profile", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                            TextButton(onClick = { showNotImplemented() }) {
-                                Text("Edit")
-                            }
+                            Text("A", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         }
-
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-
-                        SettingsRow(
-                            icon = Icons.Outlined.SwapHoriz,
-                            title = "Switch Account",
-                            subtitle = "Change to Employee Demo",
-                            onClick = { showProfileSwitcher = true }
-                        )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                        SettingsRow(
-                            icon = Icons.Outlined.Payments,
-                            title = "Currency",
-                            value = "INR (₹)",
-                            onClick = { showNotImplemented() }
-                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Ayaan", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                        Text("Student Profile", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -202,9 +161,9 @@ fun SettingsScreen(
                 }
             }
 
-            // Data & Privacy Section
+            // Display Section
             item {
-                SectionHeader("Data & Privacy")
+                SectionHeader("Display")
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -212,13 +171,21 @@ fun SettingsScreen(
                     border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Column {
-                        SettingsRow(icon = Icons.Outlined.Download, title = "Export Data (CSV)", onClick = { showNotImplemented() })
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                        SettingsRow(icon = Icons.Outlined.UploadFile, title = "Import Data (JSON)", onClick = { showNotImplemented() })
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                        // Make Dark Mode functional
                         SettingsRow(icon = Icons.Outlined.DarkMode, title = "Dark Mode", value = "System", onClick = { showNotImplemented() })
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                    }
+                }
+            }
+
+            // Danger Zone Section
+            item {
+                SectionHeader("Danger Zone")
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column {
                         SettingsRow(
                             icon = Icons.Outlined.DeleteForever,
                             title = "Reset Budget",
@@ -232,72 +199,6 @@ fun SettingsScreen(
 
             item { Spacer(modifier = Modifier.height(100.dp)) }
         }
-    }
-
-    var activeProfileId by remember(currentProfileId) { mutableStateOf(currentProfileId) }
-
-    if (showProfileSwitcher) {
-        AlertDialog(
-            onDismissRequest = { showProfileSwitcher = false },
-            title = { Text("Fast Demo Switch", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Select a profile to load its isolated data:", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    // Profile 1 Option
-                    Card(
-                        modifier = Modifier.fillMaxWidth().clickable { 
-                            activeProfileId = 1
-                            onProfileSelected(1)
-                            showProfileSwitcher = false
-                        },
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (activeProfileId == 1) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary), contentAlignment = Alignment.Center) {
-                                Text("A", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
-                            }
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column {
-                                Text("Ayaan", fontWeight = FontWeight.Bold, color = if (activeProfileId == 1) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onBackground)
-                                Text("Student Profile", fontSize = 12.sp, color = if (activeProfileId == 1) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
-
-                    // Profile 2 Option
-                    Card(
-                        modifier = Modifier.fillMaxWidth().clickable { 
-                            activeProfileId = 2
-                            onProfileSelected(2)
-                            showProfileSwitcher = false
-                        },
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (activeProfileId == 2) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondary), contentAlignment = Alignment.Center) {
-                                Text("J", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondary)
-                            }
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column {
-                                Text("John Doe", fontWeight = FontWeight.Bold, color = if (activeProfileId == 2) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onBackground)
-                                Text("Employee Profile", fontSize = 12.sp, color = if (activeProfileId == 2) MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showProfileSwitcher = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
     }
 }
 
@@ -355,6 +256,15 @@ fun SettingsSwitchRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
+    val thumbColor by androidx.compose.animation.animateColorAsState(
+        targetValue = if (checked) Color.White else Color(0xFFBCC9C5),
+        label = "thumbColor"
+    )
+    val trackColor by androidx.compose.animation.animateColorAsState(
+        targetValue = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+        label = "trackColor"
+    )
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -369,6 +279,15 @@ fun SettingsSwitchRow(
                 Text(subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(
+            checked = checked, 
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = thumbColor,
+                checkedTrackColor = trackColor,
+                uncheckedThumbColor = thumbColor,
+                uncheckedTrackColor = trackColor
+            )
+        )
     }
 }

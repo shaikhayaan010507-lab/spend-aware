@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -73,7 +74,7 @@ fun BudgetScreen(
     val fixedCategoryIds = fixedBudgets.mapNotNull { it.categoryId }.toSet()
     
     // Using a local state to visually track savings target for the presentation
-    var displaySavingsTarget by remember { mutableStateOf(10000.0) }
+    var displaySavingsTarget by remember { mutableStateOf(0.0) }
     val totalSavings = displaySavingsTarget
 
     val flexibleBudget = (totalIncome - totalFixed - totalSavings).coerceAtLeast(0.0)
@@ -185,28 +186,68 @@ fun BudgetScreen(
                             Spacer(modifier = Modifier.height(16.dp))
 
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Surface(
-                                    color = MaterialTheme.colorScheme.surfaceVariant,
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.CalendarToday, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("$daysRemaining days left", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onBackground)
-                                    }
-                                }
-                                Surface(
-                                    color = MaterialTheme.colorScheme.primaryContainer,
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.TrendingUp, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("₹${dailyLimit.toInt()} / day", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                                    }
-                                }
+                                AssistChip(
+                                    onClick = { /* Do nothing */ },
+                                    label = { Text("$daysRemaining days left") },
+                                    leadingIcon = { Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                                    colors = AssistChipDefaults.assistChipColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                        labelColor = MaterialTheme.colorScheme.onBackground,
+                                        leadingIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    border = null
+                                )
+                                
+                                AssistChip(
+                                    onClick = { /* Do nothing */ },
+                                    label = { Text("₹${dailyLimit.toInt()} / day") },
+                                    leadingIcon = { Icon(Icons.Default.TrendingUp, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                                    colors = AssistChipDefaults.assistChipColors(
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        labelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        leadingIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                    ),
+                                    border = null
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // ADVANCED PREDICTIVE TREND CARD
+                item {
+                    val daysElapsed = daysInMonth - daysRemaining + 1
+                    val projectedTotal = if (daysElapsed > 0) (spentThisMonth / daysElapsed) * daysInMonth else 0.0
+                    val isTrendingOver = projectedTotal > flexibleBudget
+                    
+                    val trendColor = if (isTrendingOver) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                    val trendText = if (isTrendingOver) {
+                        "Trend: You are on track to exceed your budget by ₹${(projectedTotal - flexibleBudget).toInt()}"
+                    } else {
+                        "Trend: On track to save ₹${(flexibleBudget - projectedTotal).toInt()}"
+                    }
+                    
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = trendColor.copy(alpha = 0.1f)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, trendColor.copy(alpha = 0.3f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = if (isTrendingOver) Icons.Default.TrendingUp else Icons.Default.TrendingDown,
+                                contentDescription = null,
+                                tint = trendColor,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text("Month-End Projection", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = trendColor.copy(alpha = 0.8f))
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(trendText, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = trendColor)
                             }
                         }
                     }
@@ -217,40 +258,43 @@ fun BudgetScreen(
                     Text("Budget Configuration", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground)
                     Spacer(modifier = Modifier.height(16.dp))
                     
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    val incomeLabel = if (currentProfileId == 1) "Monthly Allowance" else "Monthly Income"
+                    val fixedLabel = if (currentProfileId == 1) "Locked Bills (Mess/Subs)" else "Fixed Expenses"
+                    val savingsLabel = if (currentProfileId == 1) "Wishlist Fund" else "Savings Goal"
+                    val rulesLabel = if (currentProfileId == 1) "Rollover Reward" else "Budget Rules"
+
+                    androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                        columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(2),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.fillMaxWidth().height(220.dp) // Fixed height to fit the 2x2 grid
                     ) {
-                        val incomeLabel = if (currentProfileId == 1) "Monthly Allowance" else "Monthly Income"
-                        val fixedLabel = if (currentProfileId == 1) "Locked Bills (Mess/Subs)" else "Fixed Expenses"
-                        val savingsLabel = if (currentProfileId == 1) "Wishlist Fund" else "Savings Goal"
-                        val rulesLabel = if (currentProfileId == 1) "Rollover Reward" else "Budget Rules"
-                        
-                        Column {
-                            ConfigRow(
+                        item {
+                            ConfigTile(
                                 icon = Icons.Outlined.AccountBalanceWallet,
                                 label = incomeLabel,
                                 value = "₹${totalIncome.toInt()}",
                                 onClick = { showIncomeDialog = true }
                             )
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                            ConfigRow(
+                        }
+                        item {
+                            ConfigTile(
                                 icon = Icons.Outlined.Lock,
                                 label = fixedLabel,
                                 value = "₹${totalFixed.toInt()}",
                                 onClick = { showFixedExpenseDialog = true }
                             )
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                            ConfigRow(
+                        }
+                        item {
+                            ConfigTile(
                                 icon = Icons.Outlined.Star,
                                 label = savingsLabel,
                                 value = "₹${totalSavings.toInt()}",
                                 onClick = { showSavingsGoalDialog = true }
                             )
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                            ConfigRow(
+                        }
+                        item {
+                            ConfigTile(
                                 icon = Icons.Default.TrendingUp,
                                 label = rulesLabel,
                                 value = "Rollover Unused",
@@ -386,26 +430,28 @@ fun BudgetScreen(
 }
 
 @Composable
-fun ConfigRow(icon: androidx.compose.ui.graphics.vector.ImageVector? = null, label: String, value: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+fun ConfigTile(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().aspectRatio(1f).clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (icon != null) {
-                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
-                Spacer(modifier = Modifier.width(12.dp))
+        Column(
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(20.dp))
             }
-            Text(label, fontSize = 16.sp, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Medium)
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(value, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(modifier = Modifier.width(8.dp))
-            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.size(20.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, maxLines = 2, minLines = 2)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(value, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
         }
     }
 }

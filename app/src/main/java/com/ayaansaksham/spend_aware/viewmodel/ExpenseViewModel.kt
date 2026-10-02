@@ -54,6 +54,19 @@ class ExpenseViewModel(
             repository.deleteExpense(expense)
         }
     }
+
+    suspend fun checkAnomaly(expense: Expense, safeToSpendToday: Double, categoryName: String): com.ayaansaksham.spend_aware.domain.logic.RealTimeAnomalyResult {
+        val currentProfileId = userSettingsRepository.settings.first()?.activeProfileId ?: 1
+        val history = repository.getCategoryAmounts(expense.categoryId ?: -1, currentProfileId)
+        
+        return com.ayaansaksham.spend_aware.domain.logic.ExpenseAnomalyDetector.detect(
+            amount = expense.amount,
+            safeToSpendToday = safeToSpendToday,
+            categoryHistory = history,
+            ceiling = 10000.0, // Fixed default ceiling since settings doesn't have it explicitly yet
+            categoryName = categoryName
+        )
+    }
 }
 
 class ExpenseViewModelFactory(

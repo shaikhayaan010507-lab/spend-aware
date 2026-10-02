@@ -1,10 +1,20 @@
 package com.ayaansaksham.spend_aware.ui.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -94,7 +104,7 @@ fun DashboardScreen(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
             border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
@@ -108,12 +118,24 @@ fun DashboardScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Text(
-                    text = "₹${dailyLimit.toInt()}",
-                    fontSize = 48.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
+                AnimatedContent(
+                    targetState = dailyLimit.toInt(),
+                    transitionSpec = {
+                        if (targetState > initialState) {
+                            slideInVertically { height -> height } togetherWith slideOutVertically { height -> -height }
+                        } else {
+                            slideInVertically { height -> -height } togetherWith slideOutVertically { height -> height }
+                        }
+                    },
+                    label = "dailyLimitAnimation"
+                ) { targetCount ->
+                    Text(
+                        text = "₹$targetCount",
+                        fontSize = 48.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(20.dp))
 
@@ -133,8 +155,14 @@ fun DashboardScreen(
                     else -> MaterialTheme.colorScheme.primary             // Green (Safe)
                 }
 
+                val animatedProgress by animateFloatAsState(
+                    targetValue = progress,
+                    animationSpec = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+                    label = "ProgressBarAnim"
+                )
+
                 LinearProgressIndicator(
-                    progress = { progress },
+                    progress = { animatedProgress },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(12.dp)
@@ -155,13 +183,25 @@ fun DashboardScreen(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("Days left", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("$daysRemaining", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                    AnimatedContent(
+                        targetState = daysRemaining,
+                        transitionSpec = {
+                            if (targetState > initialState) {
+                                slideInVertically { height -> height } togetherWith slideOutVertically { height -> -height }
+                            } else {
+                                slideInVertically { height -> -height } togetherWith slideOutVertically { height -> height }
+                            }
+                        },
+                        label = "daysRemainingAnimation"
+                    ) { targetCount ->
+                        Text("$targetCount", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                    }
                 }
             }
 
@@ -169,13 +209,25 @@ fun DashboardScreen(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("Remaining Allowance", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("₹${monthlyPool.toInt()}", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                    AnimatedContent(
+                        targetState = monthlyPool.toInt(),
+                        transitionSpec = {
+                            if (targetState > initialState) {
+                                slideInVertically { height -> height } togetherWith slideOutVertically { height -> -height }
+                            } else {
+                                slideInVertically { height -> -height } togetherWith slideOutVertically { height -> height }
+                            }
+                        },
+                        label = "monthlyPoolAnimation"
+                    ) { targetCount ->
+                        Text("₹$targetCount", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                    }
                 }
             }
         }
@@ -199,21 +251,26 @@ fun DashboardScreen(
         
         val diff = spentToday - spentYesterday
         val comparisonMessage = when {
-            spentToday > spentYesterday -> "You've spent ₹${diff.toInt()} more than yesterday 📈"
-            spentToday < spentYesterday -> "You've spent ₹${(-diff).toInt()} less than yesterday 📉"
-            else -> "You've spent exactly the same as yesterday ➖"
+            spentToday > spentYesterday -> "You've spent ₹${diff.toInt()} more than yesterday"
+            spentToday < spentYesterday -> "You've spent ₹${(-diff).toInt()} less than yesterday"
+            else -> "You've spent exactly the same as yesterday"
         }
         val comparisonColor = when {
             spentToday > spentYesterday -> MaterialTheme.colorScheme.error // Red (Bad)
             spentToday < spentYesterday -> MaterialTheme.colorScheme.primary // Teal (Good)
             else -> MaterialTheme.colorScheme.onSurfaceVariant
         }
+        val comparisonIcon = when {
+            spentToday > spentYesterday -> Icons.Rounded.ArrowUpward
+            spentToday < spentYesterday -> Icons.Rounded.ArrowDownward
+            else -> null
+        }
 
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
             border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -241,14 +298,28 @@ fun DashboardScreen(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), thickness = 1.dp)
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Text(
-                    text = comparisonMessage,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = comparisonColor,
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
-                )
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (comparisonIcon != null) {
+                        Icon(
+                            imageVector = comparisonIcon,
+                            contentDescription = null,
+                            tint = comparisonColor,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+                    Text(
+                        text = comparisonMessage,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = comparisonColor,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
 

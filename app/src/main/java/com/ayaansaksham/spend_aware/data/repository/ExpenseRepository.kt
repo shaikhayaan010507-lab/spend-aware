@@ -52,6 +52,10 @@ class ExpenseRepository(private val expenseDao: ExpenseDao) {
         return expenseDao.getTotalSpentByCategoryBetweenDates(categoryId, startMillis, endMillis, profileId) ?: 0.0
     }
 
+    suspend fun getCategoryAmounts(categoryId: Int, profileId: Int): List<Double> {
+        return expenseDao.getCategoryAmounts(categoryId, profileId)
+    }
+
     private fun getCurrentMonthRange(): Pair<Long, Long> {
         val calendar = Calendar.getInstance()
         val now = calendar.timeInMillis

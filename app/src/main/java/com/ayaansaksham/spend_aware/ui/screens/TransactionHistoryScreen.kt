@@ -19,11 +19,18 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.Restaurant
-import androidx.compose.material.icons.outlined.DirectionsCar
-import androidx.compose.material.icons.outlined.ShoppingBag
-import androidx.compose.material.icons.outlined.ReceiptLong
-import androidx.compose.material.icons.outlined.Category
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Fastfood
+import androidx.compose.material.icons.rounded.DirectionsBus
+import androidx.compose.material.icons.rounded.ShoppingBag
+import androidx.compose.material.icons.rounded.Receipt
+import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.LocalGroceryStore
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Event
+import androidx.compose.material.icons.rounded.TrendingUp
+import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -50,6 +57,7 @@ fun TransactionHistoryScreen(
     expenses: StateFlow<List<Expense>>? = null,
     categories: StateFlow<List<Category>>? = null,
     budgets: StateFlow<List<com.ayaansaksham.spend_aware.data.local.entity.Budget>>? = null,
+    onDeleteExpense: (Expense) -> Unit = {},
     onNavigateBack: () -> Unit = {}
 ) {
     val expenseList by (expenses ?: kotlinx.coroutines.flow.MutableStateFlow(emptyList())).collectAsState()
@@ -154,7 +162,7 @@ fun TransactionHistoryScreen(
                 onCategoryChange = { selectedCategory = it }
             )
             Spacer(modifier = Modifier.height(16.dp))
-            ExpenseListView(filteredExpenses, categoryList)
+            ExpenseListView(filteredExpenses, categoryList, onDeleteExpense)
         } else {
             ExpenseCalendarView(expenseList, budgetList)
         }
@@ -165,6 +173,7 @@ fun TransactionHistoryScreen(
 fun QuickStatsRow(expenseList: List<Expense>, categoryList: List<Category>) {
     val totalSpent = expenseList.sumOf { it.amount }
     val txCount = expenseList.size
+    val txText = if (txCount == 1) "1 entry" else "$txCount entries"
     val avgSpend = if (txCount > 0) totalSpent / txCount else 0.0
 
     val categoryMap = categoryList.associateBy { it.categoryId }
@@ -179,7 +188,7 @@ fun QuickStatsRow(expenseList: List<Expense>, categoryList: List<Category>) {
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         StatCard(title = "TOTAL SPENT", value = "₹${totalSpent.toInt()}", valueColor = Color(0xFFD32F2F))
-        StatCard(title = "TRANSACTIONS", value = "$txCount logs", valueColor = Color(0xFF1A1A1A))
+        StatCard(title = "TRANSACTIONS", value = txText, valueColor = Color(0xFF1A1A1A))
         StatCard(title = "AVERAGE / LOG", value = "₹${avgSpend.toInt()}", valueColor = Color(0xFF00796B))
         StatCard(title = "TOP CATEGORY", value = topCategoryName, valueColor = Color(0xFF1A1A1A))
     }
@@ -319,8 +328,9 @@ fun FiltersSection(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun ExpenseListView(expenseList: List<Expense>, categoryList: List<Category>) {
+fun ExpenseListView(expenseList: List<Expense>, categoryList: List<Category>, onDeleteExpense: (Expense) -> Unit) {
     if (expenseList.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text("No transactions yet.", color = Color.Gray)
@@ -329,63 +339,89 @@ fun ExpenseListView(expenseList: List<Expense>, categoryList: List<Category>) {
         val categoryMap = categoryList.associateBy { it.categoryId }
         val zoneId = ZoneId.systemDefault()
         
+        val today = LocalDate.now(zoneId)
+        val yesterday = today.minusDays(1)
+        
         // Group by Date
         val groupedExpenses = expenseList.groupBy { expense ->
             Instant.ofEpochMilli(expense.dateMillis).atZone(zoneId).toLocalDate()
         }.toSortedMap(compareByDescending { it })
         
-        val headerFormatter = DateTimeFormatter.ofPattern("EEE, MMM d (yyyy-MM-dd)")
+        val fallbackFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy")
         val timeFormatter = DateTimeFormatter.ofPattern("hh:mm a")
 
         LazyColumn(
             contentPadding = PaddingValues(bottom = 100.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             groupedExpenses.forEach { (date, dailyExpenses) ->
-                item {
+                stickyHeader {
                     val dailyTotal = dailyExpenses.sumOf { it.amount }
-                    val dateString = date.format(headerFormatter)
+                    val dateString = when (date) {
+                        today -> "Today"
+                        yesterday -> "Yesterday"
+                        else -> date.format(fallbackFormatter)
+                    }
                     
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFFF0F4F8))
+                            .padding(vertical = 12.dp, horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
-                            // Date Header
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(Color(0xFFFAFAFA))
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(dateString, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.DarkGray)
-                                }
-                                Text("-₹${dailyTotal.toInt()}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFFD32F2F))
+                        Text(dateString, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.DarkGray)
+                        Text("-₹${dailyTotal.toInt()}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                    }
+                }
+
+                items(dailyExpenses, key = { it.expenseId }) { expense ->
+                    val dismissState = rememberSwipeToDismissBoxState(
+                        confirmValueChange = { dismissValue ->
+                            if (dismissValue == SwipeToDismissBoxValue.EndToStart || dismissValue == SwipeToDismissBoxValue.StartToEnd) {
+                                onDeleteExpense(expense)
+                                true
+                            } else {
+                                false
                             }
-                            
-                            HorizontalDivider(color = Color(0xFFE0E0E0), thickness = 1.dp)
+                        }
+                    )
 
-                            // Items
-                            dailyExpenses.forEachIndexed { index, expense ->
-                                val category = expense.categoryId?.let { categoryMap[it] }
-                                val categoryName = category?.name ?: "Uncategorized"
-                                val colorInt = safeParseColor(category?.colorHex)
-                                val categoryColor = if (colorInt != null) Color(colorInt) else Color(0xFFE0F2F1)
-                                val tintColor = if (colorInt != null) Color.White else Color(0xFF00796B)
-                                val title = if (!expense.note.isNullOrBlank()) expense.note else categoryName
-                                val timeStr = Instant.ofEpochMilli(expense.dateMillis).atZone(zoneId).format(timeFormatter)
+                    val category = expense.categoryId?.let { categoryMap[it] }
+                    val categoryName = category?.name ?: "Uncategorized"
+                    val colorInt = safeParseColor(category?.colorHex)
+                    val categoryColor = if (colorInt != null) Color(colorInt) else Color(0xFFE0F2F1)
+                    val tintColor = if (colorInt != null) Color.White else Color(0xFF00796B)
+                    val title = if (!expense.note.isNullOrBlank()) expense.note else categoryName
+                    val timeStr = Instant.ofEpochMilli(expense.dateMillis).atZone(zoneId).format(timeFormatter)
 
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        modifier = Modifier.animateItem(),
+                        backgroundContent = {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(MaterialTheme.colorScheme.error)
+                                    .padding(horizontal = 20.dp),
+                                contentAlignment = Alignment.CenterEnd
+                            ) {
+                                Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = Color.White)
+                            }
+                        },
+                        content = {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color.White),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                            ) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                                        .padding(horizontal = 16.dp, vertical = 16.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Box(
@@ -412,13 +448,9 @@ fun ExpenseListView(expenseList: List<Expense>, categoryList: List<Category>) {
 
                                     Text("-₹${expense.amount.toInt()}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A1A1A))
                                 }
-                                
-                                if (index < dailyExpenses.lastIndex) {
-                                    HorizontalDivider(color = Color(0xFFF0F4F8), thickness = 1.dp, modifier = Modifier.padding(start = 72.dp))
-                                }
                             }
                         }
-                    }
+                    )
                 }
             }
         }
@@ -427,11 +459,16 @@ fun ExpenseListView(expenseList: List<Expense>, categoryList: List<Category>) {
 
 fun getCategoryIcon(categoryName: String): ImageVector {
     return when (categoryName.lowercase()) {
-        "food", "dining" -> Icons.Outlined.Restaurant
-        "transport" -> Icons.Outlined.DirectionsCar
-        "shopping" -> Icons.Outlined.ShoppingBag
-        "bills" -> Icons.Default.Receipt
-        else -> Icons.Outlined.Category
+        "food", "dining", "canteen" -> Icons.Rounded.Fastfood
+        "transport", "commute" -> Icons.Rounded.DirectionsBus
+        "shopping" -> Icons.Rounded.ShoppingBag
+        "bills", "bills & utilities", "rent", "hostel fees" -> Icons.Rounded.Receipt
+        "health & fitness" -> Icons.Rounded.FavoriteBorder
+        "groceries" -> Icons.Rounded.LocalGroceryStore
+        "stationery" -> Icons.Rounded.Edit
+        "events" -> Icons.Rounded.Event
+        "investments" -> Icons.Rounded.TrendingUp
+        else -> Icons.Rounded.MoreHoriz
     }
 }
 

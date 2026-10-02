@@ -30,4 +30,7 @@ interface ExpenseDao {
 
     @Query("SELECT SUM(amount) FROM expenses WHERE categoryId = :categoryId AND profileId = :profileId AND dateMillis BETWEEN :startMillis AND :endMillis")
     suspend fun getTotalSpentByCategoryBetweenDates(categoryId: Int, startMillis: Long, endMillis: Long, profileId: Int): Double?
+
+    @Query("SELECT amount FROM expenses WHERE categoryId = :categoryId AND profileId = :profileId ORDER BY dateMillis DESC")
+    suspend fun getCategoryAmounts(categoryId: Int, profileId: Int): List<Double>
 }
