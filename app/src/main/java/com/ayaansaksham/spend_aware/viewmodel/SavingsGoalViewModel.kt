@@ -9,6 +9,7 @@ import com.ayaansaksham.spend_aware.data.repository.UserSettingsRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -16,7 +17,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalCoroutinesApi::class)
 class SavingsGoalViewModel(
     private val repository: SavingsGoalRepository,
-    userSettingsRepository: UserSettingsRepository
+    private val userSettingsRepository: UserSettingsRepository
 ) : ViewModel() {
 
     private val activeProfileId = userSettingsRepository.settings.flatMapLatest { settings ->
@@ -34,7 +35,10 @@ class SavingsGoalViewModel(
         )
 
     fun addGoal(goal: SavingsGoal) {
-        viewModelScope.launch { repository.insertGoal(goal) }
+        viewModelScope.launch {
+            val profileId = userSettingsRepository.settings.first()?.activeProfileId ?: 1
+            repository.insertGoal(goal.copy(profileId = profileId))
+        }
     }
 
     fun updateGoal(goal: SavingsGoal) {
