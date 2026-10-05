@@ -19,15 +19,17 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ayaansaksham.spend_aware.viewmodel.SettingsViewModel
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
+    settingsViewModel: SettingsViewModel,
     currentProfileId: Int = 1,
     onProfileSelected: (Int) -> Unit = {}
 ) {
-    var showProfileSwitcher by remember { mutableStateOf(false) }
+    val userPersona by settingsViewModel.userPersona.collectAsState()
 
     // Snackbar state for features that are coming soon
     val snackbarHostState = remember { SnackbarHostState() }
@@ -71,15 +73,43 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth().padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
+                        val initial = userPersona.firstOrNull()?.uppercaseChar() ?: 'S'
                         Box(
                             modifier = Modifier.size(72.dp).clip(CircleShape).background(Color(0xFF6750A4)), // Purple
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("A", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(initial.toString(), fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         }
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text("Ayaan", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-                        Text("Student Profile", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(userPersona, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                        Text("$userPersona Profile", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        
+                        Spacer(modifier = Modifier.height(24.dp))
+                        
+                        SingleChoiceSegmentedButtonRow(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            SegmentedButton(
+                                selected = userPersona == "Student",
+                                onClick = { 
+                                    settingsViewModel.updatePersona("Student")
+                                    onProfileSelected(1) // Keep Room in sync
+                                },
+                                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                            ) {
+                                Text("Student")
+                            }
+                            SegmentedButton(
+                                selected = userPersona == "Employee",
+                                onClick = { 
+                                    settingsViewModel.updatePersona("Employee")
+                                    onProfileSelected(2) // Keep Room in sync
+                                },
+                                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                            ) {
+                                Text("Employee")
+                            }
+                        }
                     }
                 }
             }

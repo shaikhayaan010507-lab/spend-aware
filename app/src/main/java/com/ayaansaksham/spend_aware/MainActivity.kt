@@ -246,8 +246,14 @@ class MainActivity : ComponentActivity() {
 
                         composable(Screen.Settings.route) {
                             val userSettings by userSettingsRepository.settings.collectAsState(initial = null)
+                            val activeProfileId = userSettings?.activeProfileId ?: 1
+                            val settingsViewModel: com.ayaansaksham.spend_aware.viewmodel.SettingsViewModel = viewModel(
+                                factory = com.ayaansaksham.spend_aware.viewmodel.SettingsViewModelFactory(userPreferencesRepository)
+                            )
+                            
                             com.ayaansaksham.spend_aware.ui.screens.SettingsScreen(
-                                currentProfileId = userSettings?.activeProfileId ?: 1,
+                                settingsViewModel = settingsViewModel,
+                                currentProfileId = activeProfileId,
                                 onProfileSelected = { newProfileId ->
                                     val currentSettings = userSettings ?: com.ayaansaksham.spend_aware.data.local.entity.UserSettings(id = 1, firebaseUid = "local_only", activeProfileId = 1)
                                     CoroutineScope(Dispatchers.IO).launch {

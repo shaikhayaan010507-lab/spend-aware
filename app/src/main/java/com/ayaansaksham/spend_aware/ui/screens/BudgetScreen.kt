@@ -182,34 +182,6 @@ fun BudgetScreen(
                                 color = barColor,
                                 trackColor = MaterialTheme.colorScheme.surfaceVariant
                             )
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                AssistChip(
-                                    onClick = { /* Do nothing */ },
-                                    label = { Text("$daysRemaining days left") },
-                                    leadingIcon = { Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                                    colors = AssistChipDefaults.assistChipColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                        labelColor = MaterialTheme.colorScheme.onBackground,
-                                        leadingIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                    ),
-                                    border = null
-                                )
-                                
-                                AssistChip(
-                                    onClick = { /* Do nothing */ },
-                                    label = { Text("₹${dailyLimit.toInt()} / day") },
-                                    leadingIcon = { Icon(Icons.Default.TrendingUp, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                                    colors = AssistChipDefaults.assistChipColors(
-                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                        labelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        leadingIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                                    ),
-                                    border = null
-                                )
-                            }
                         }
                     }
                 }
