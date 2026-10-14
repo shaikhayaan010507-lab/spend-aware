@@ -51,6 +51,7 @@ import com.ayaansaksham.spend_aware.viewmodel.ExpenseViewModel
 import com.ayaansaksham.spend_aware.viewmodel.ExpenseViewModelFactory
 import com.ayaansaksham.spend_aware.viewmodel.SavingsGoalViewModel
 import com.ayaansaksham.spend_aware.viewmodel.SavingsGoalViewModelFactory
+import com.ayaansaksham.spend_aware.viewmodel.SplashState
 import androidx.compose.ui.unit.dp
 
 // Data class to define the bottom navigation tabs
@@ -168,7 +169,8 @@ class MainActivity : ComponentActivity() {
 
                         composable(Screen.Dashboard.route) {
                             DashboardScreen(
-                                userName = "Ayaan", // You can pull this from UserSettingsViewModel later
+                                userName = (splashState as? SplashState.SetupComplete)
+                                    ?.userName ?: "Ayaan",
                                 expenses = expenseViewModel.allExpenses,
                                 budgets = budgetViewModel.allBudgets
                             )
