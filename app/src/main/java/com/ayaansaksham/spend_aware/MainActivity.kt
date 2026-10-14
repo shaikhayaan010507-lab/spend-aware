@@ -178,6 +178,7 @@ class MainActivity : ComponentActivity() {
                             AnalyticsScreen(
                                 expenses = expenseViewModel.allExpenses,
                                 categories = categoryViewModel.allCategories,
+                                budgets = budgetViewModel.allBudgets,
                                 onNavigateBack = { navController.popBackStack() }
                             )
                         }

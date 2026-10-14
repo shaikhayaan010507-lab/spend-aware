@@ -158,17 +158,72 @@ fun BudgetScreen(
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                             Spacer(modifier = Modifier.height(20.dp))
 
-                            Text("AVAILABLE FOR SPENDING", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
+                            Text("AVAILABLE FOR PACING", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("₹${flexibleBudget.toInt()}", fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("₹${flexibleBudget.toInt()}", fontSize = 36.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Surface(
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text("Live Pace", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                                }
+                            }
 
                             Spacer(modifier = Modifier.height(16.dp))
-
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text("Spent: ₹${spentThisMonth.toInt()}", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text("Remaining: ₹${remaining.toInt()}", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            
+                            // Cycle Commitment Ratio Bar (Fixed vs Save vs Flexible)
+                            val totalBudgetAmount = totalIncome.coerceAtLeast(1.0)
+                            val fixedRatio = (totalFixed / totalBudgetAmount).toFloat()
+                            val savingsRatio = (totalSavings / totalBudgetAmount).toFloat()
+                            val flexRatio = 1f - fixedRatio - savingsRatio
+                            
+                            Row(modifier = Modifier.fillMaxWidth().height(12.dp).clip(RoundedCornerShape(6.dp))) {
+                                Box(modifier = Modifier.weight(fixedRatio.coerceAtLeast(0.01f)).fillMaxHeight().background(MaterialTheme.colorScheme.error))
+                                Box(modifier = Modifier.weight(savingsRatio.coerceAtLeast(0.01f)).fillMaxHeight().background(MaterialTheme.colorScheme.secondary))
+                                Box(modifier = Modifier.weight(flexRatio.coerceAtLeast(0.01f)).fillMaxHeight().background(MaterialTheme.colorScheme.primary))
                             }
+                            
                             Spacer(modifier = Modifier.height(8.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Cycle Commitment Ratio", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.error))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("${(fixedRatio*100).toInt()}% Fixed", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondary))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("${(savingsRatio*100).toInt()}% Save", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("${(flexRatio*100).toInt()}% Pace", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(20.dp))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Column {
+                                    Text("Spent: ₹${spentThisMonth.toInt()}", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("Remaining: ₹${remaining.toInt()}", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Surface(
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text("⚡ ₹${dailyLimit.toInt()} / daily pace", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
                             
                             val barColor = when {
                                 progress >= 1f -> MaterialTheme.colorScheme.error
@@ -230,10 +285,10 @@ fun BudgetScreen(
                     Text("Budget Configuration", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground)
                     Spacer(modifier = Modifier.height(16.dp))
                     
-                    val incomeLabel = if (currentProfileId == 1) "Monthly Allowance" else "Monthly Income"
-                    val fixedLabel = if (currentProfileId == 1) "Locked Bills (Mess/Subs)" else "Fixed Expenses"
-                    val savingsLabel = if (currentProfileId == 1) "Wishlist Fund" else "Savings Goal"
-                    val rulesLabel = if (currentProfileId == 1) "Rollover Reward" else "Budget Rules"
+                    val incomeLabel = if (currentProfileId == 1) "Daily Floor" else "Daily Floor"
+                    val fixedLabel = if (currentProfileId == 1) "Rollover Rule" else "Rollover Rule"
+                    val savingsLabel = if (currentProfileId == 1) "Weekend Boost" else "Weekend Boost"
+                    val rulesLabel = if (currentProfileId == 1) "Hard Ceiling" else "Hard Ceiling"
 
                     androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
                         columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(2),
@@ -245,32 +300,36 @@ fun BudgetScreen(
                             ConfigTile(
                                 icon = Icons.Outlined.AccountBalanceWallet,
                                 label = incomeLabel,
-                                value = "₹${totalIncome.toInt()}",
-                                onClick = { showIncomeDialog = true }
+                                value = "₹500",
+                                onClick = { showNotImplemented() },
+                                indicatorColor = MaterialTheme.colorScheme.primary
                             )
                         }
                         item {
                             ConfigTile(
                                 icon = Icons.Outlined.Lock,
                                 label = fixedLabel,
-                                value = "₹${totalFixed.toInt()}",
-                                onClick = { showFixedExpenseDialog = true }
+                                value = "Active",
+                                onClick = { showNotImplemented() },
+                                indicatorColor = MaterialTheme.colorScheme.primary
                             )
                         }
                         item {
                             ConfigTile(
                                 icon = Icons.Outlined.Star,
                                 label = savingsLabel,
-                                value = "₹${totalSavings.toInt()}",
-                                onClick = { showSavingsGoalDialog = true }
+                                value = "Disabled",
+                                onClick = { showNotImplemented() },
+                                indicatorColor = MaterialTheme.colorScheme.outlineVariant
                             )
                         }
                         item {
                             ConfigTile(
-                                icon = Icons.Default.TrendingUp,
+                                icon = Icons.Default.TrendingDown,
                                 label = rulesLabel,
-                                value = "Rollover Unused",
-                                onClick = { showNotImplemented() }
+                                value = "₹10,000",
+                                onClick = { showNotImplemented() },
+                                indicatorColor = MaterialTheme.colorScheme.error
                             )
                         }
                     }
@@ -278,14 +337,8 @@ fun BudgetScreen(
 
                 // FIXED COMMITMENTS SECTION (USING BUDGET ENTITY)
                 item {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text("Fixed Commitments", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground)
-                        TextButton(onClick = { showNotImplemented() }) {
-                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Add")
-                        }
-                    }
+                    Text("Fixed Recurring Outflows", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground)
+                    Spacer(modifier = Modifier.height(16.dp))
                     
                     if (fixedBudgets.isEmpty()) {
                         Text("No fixed commitments configured.", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -327,13 +380,62 @@ fun BudgetScreen(
                                             Spacer(modifier = Modifier.width(16.dp))
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(category?.name ?: "Commitment", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-                                                Text("Due this month", fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary)
+                                                Text("Auto-Pay Active", fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary)
                                             }
                                             Text("₹${budget.limitAmount.toInt()}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
                                         }
                                     }
                                 }
                             }
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Add Fixed Commitment Button
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().clickable { showFixedExpenseDialog = true },
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.Transparent,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)) // Dashed effect placeholder
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("+ Add Fixed Commitment", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+                
+                // INTELLIGENCE FOOTER CARD
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Star,
+                                contentDescription = "Intelligence",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Text(
+                                "Your daily pace automatically recalibrates at midnight if discretionary spending stays under ₹${dailyLimit.toInt()} today.",
+                                fontSize = 13.sp,
+                                lineHeight = 18.sp,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
                         }
                     }
                     Spacer(modifier = Modifier.height(100.dp))
@@ -402,7 +504,7 @@ fun BudgetScreen(
 }
 
 @Composable
-fun ConfigTile(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String, onClick: () -> Unit) {
+fun ConfigTile(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String, indicatorColor: Color? = null, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().aspectRatio(1f).clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
@@ -423,7 +525,13 @@ fun ConfigTile(icon: androidx.compose.ui.graphics.vector.ImageVector, label: Str
             Spacer(modifier = Modifier.height(12.dp))
             Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, maxLines = 2, minLines = 2)
             Spacer(modifier = Modifier.height(4.dp))
-            Text(value, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (indicatorColor != null) {
+                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(indicatorColor))
+                    Spacer(modifier = Modifier.width(6.dp))
+                }
+                Text(value, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+            }
         }
     }
 }
