@@ -1,9 +1,13 @@
 package com.ayaansaksham.spend_aware.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "categories")
+@Entity(
+    tableName = "categories",
+    indices = [Index(value = ["name", "profileId"], unique = true)]
+)
 data class Category(
     @PrimaryKey(autoGenerate = true)
     val categoryId: Int = 0,

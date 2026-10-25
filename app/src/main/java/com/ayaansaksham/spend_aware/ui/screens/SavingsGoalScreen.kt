@@ -152,7 +152,7 @@ fun SavingsGoalCard(goal: SavingsGoal, onAddFundsClick: () -> Unit) {
     )
 
     // Turn green if the goal is completed
-    val progressColor = if (targetProgress >= 1f) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary
+    val progressColor = if (targetProgress >= 1f) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary
 
     Card(
         modifier = Modifier.fillMaxWidth(),

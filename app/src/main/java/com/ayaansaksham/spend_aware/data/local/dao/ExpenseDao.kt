@@ -33,4 +33,7 @@ interface ExpenseDao {
 
     @Query("SELECT amount FROM expenses WHERE categoryId = :categoryId AND profileId = :profileId ORDER BY dateMillis DESC")
     suspend fun getCategoryAmounts(categoryId: Int, profileId: Int): List<Double>
+
+    @Query("SELECT amount FROM expenses WHERE categoryId = :categoryId AND profileId = :profileId AND expenseId != :excludeExpenseId ORDER BY dateMillis DESC")
+    suspend fun getCategoryAmountsExcluding(categoryId: Int, profileId: Int, excludeExpenseId: Int): List<Double>
 }

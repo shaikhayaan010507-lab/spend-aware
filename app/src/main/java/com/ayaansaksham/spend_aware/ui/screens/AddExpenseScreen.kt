@@ -53,9 +53,11 @@ fun AddExpenseScreen(
     budgets: StateFlow<List<com.ayaansaksham.spend_aware.data.local.entity.Budget>>? = null,
     expenses: StateFlow<List<Expense>>? = null,
     currentProfileId: Int = 1,
+    expenseIdToEdit: Int? = null,
     onSaveExpense: (Expense) -> Unit,
+    onUpdateExpense: (Expense) -> Unit = {},
     onAddCategory: (Category) -> Unit = {},
-    onCheckAnomaly: suspend (Expense, Double, String) -> RealTimeAnomalyResult = { _, _, _ -> RealTimeAnomalyResult.None },
+    onCheckAnomaly: suspend (Expense, Double, String, Int?) -> RealTimeAnomalyResult = { _, _, _, _ -> RealTimeAnomalyResult.None },
     onNavigateBack: () -> Unit,
     initialDateMillis: Long = System.currentTimeMillis()
 ) {
@@ -72,6 +74,7 @@ fun AddExpenseScreen(
     var selectedCategoryId by rememberSaveable { mutableStateOf<Int?>(null) }
     var selectedDateMillis by rememberSaveable { mutableStateOf(initialDateMillis) }
     var showDatePicker by remember { mutableStateOf(false) }
+    var hasPrefilled by rememberSaveable { mutableStateOf(false) }
 
     var showAddCategorySheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
@@ -82,6 +85,23 @@ fun AddExpenseScreen(
 
     var pendingExpense by remember { mutableStateOf<Expense?>(null) }
     var anomalyResult by remember { mutableStateOf<RealTimeAnomalyResult?>(null) }
+
+    LaunchedEffect(expenseIdToEdit, expenseList) {
+        if (expenseIdToEdit != null && !hasPrefilled && expenseList.isNotEmpty()) {
+            val expenseToEdit = expenseList.find { it.expenseId == expenseIdToEdit }
+            if (expenseToEdit != null) {
+                amountText = if (expenseToEdit.amount % 1 == 0.0) expenseToEdit.amount.toInt().toString() else expenseToEdit.amount.toString()
+                note = expenseToEdit.note ?: ""
+                selectedCategoryId = expenseToEdit.categoryId
+                selectedDateMillis = expenseToEdit.dateMillis
+                hasPrefilled = true
+            }
+        }
+    }
+
+    val isEditMode = expenseIdToEdit != null
+    val screenTitle = if (isEditMode) "Edit Expense" else "Add Expense"
+    val buttonText = if (isEditMode) "Save changes" else "Record Expense"
 
     // Calculate Safe to Spend Today
     val zoneId = ZoneId.systemDefault()
@@ -126,7 +146,7 @@ fun AddExpenseScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Add Expense", fontWeight = FontWeight.SemiBold) },
+                title = { Text(screenTitle, fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.Close, contentDescription = "Close")
@@ -379,6 +399,7 @@ fun AddExpenseScreen(
                     val amount = amountText.toDoubleOrNull()
                     if (amount != null && amount > 0 && selectedCategoryId != null && !isFutureDate) {
                         val expense = Expense(
+                            expenseId = expenseIdToEdit ?: 0,
                             amount = amount,
                             categoryId = selectedCategoryId,
                             note = note.trim().ifEmpty { null },
@@ -388,11 +409,15 @@ fun AddExpenseScreen(
                         
                         coroutineScope.launch {
                             val categoryName = categoryList.find { it.categoryId == selectedCategoryId }?.name ?: "Unknown"
-                            val anomaly = onCheckAnomaly(expense, dailyLimit, categoryName)
+                            val anomaly = onCheckAnomaly(expense, dailyLimit, categoryName, expenseIdToEdit)
                             
                             if (anomaly is RealTimeAnomalyResult.None) {
-                                onSaveExpense(expense)
-                                snackbarHostState.showSnackbar("Expense saved successfully")
+                                if (isEditMode) {
+                                    onUpdateExpense(expense)
+                                } else {
+                                    onSaveExpense(expense)
+                                }
+                                snackbarHostState.showSnackbar(if (isEditMode) "Expense updated successfully" else "Expense saved successfully")
                                 onNavigateBack()
                             } else {
                                 pendingExpense = expense
@@ -416,7 +441,7 @@ fun AddExpenseScreen(
             ) {
                 Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Record Expense", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(buttonText, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -475,7 +500,7 @@ fun AddExpenseScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     defaultColors.forEach { hexColor ->
-                        val color = try { Color(android.graphics.Color.parseColor(hexColor)) } catch (e: Exception) { Color.Gray }
+                        val color = try { Color(android.graphics.Color.parseColor(hexColor)) } catch (e: Exception) { MaterialTheme.colorScheme.primary }
                         val isColorSelected = selectedNewCategoryColor == hexColor
                         
                         Box(
@@ -492,7 +517,7 @@ fun AddExpenseScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             if (isColorSelected) {
-                                Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.surface, modifier = Modifier.size(20.dp))
                             }
                         }
                     }
@@ -547,10 +572,12 @@ fun AddExpenseScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    pendingExpense?.let { onSaveExpense(it) }
+                    pendingExpense?.let {
+                        if (isEditMode) onUpdateExpense(it) else onSaveExpense(it)
+                    }
                     anomalyResult = null
                     coroutineScope.launch {
-                        snackbarHostState.showSnackbar("Expense saved successfully")
+                        snackbarHostState.showSnackbar(if (isEditMode) "Expense updated successfully" else "Expense saved successfully")
                         onNavigateBack()
                     }
                 }) {
@@ -621,7 +648,7 @@ fun CategoryGridItem(
             Icon(
                 imageVector = icon,
                 contentDescription = category.name,
-                tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = if (isSelected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(24.dp)
             )
         }

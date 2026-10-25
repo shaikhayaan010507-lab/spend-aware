@@ -26,8 +26,12 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsScreen(
     settingsViewModel: SettingsViewModel,
+    expenses: kotlinx.coroutines.flow.StateFlow<List<com.ayaansaksham.spend_aware.data.local.entity.Expense>>? = null,
+    categories: kotlinx.coroutines.flow.StateFlow<List<com.ayaansaksham.spend_aware.data.local.entity.Category>>? = null,
     currentProfileId: Int = 1,
-    onProfileSelected: (Int) -> Unit = {}
+    onProfileSelected: (Int) -> Unit = {},
+    onNavigateToCategories: () -> Unit = {},
+    onLogout: () -> Unit = {}
 ) {
     val userPersona by settingsViewModel.userPersona.collectAsState()
 
@@ -75,10 +79,10 @@ fun SettingsScreen(
                     ) {
                         val initial = userPersona.firstOrNull()?.uppercaseChar() ?: 'S'
                         Box(
-                            modifier = Modifier.size(72.dp).clip(CircleShape).background(Color(0xFF6750A4)), // Purple
+                            modifier = Modifier.size(72.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary), // Dynamic primary
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(initial.toString(), fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(initial.toString(), fontSize = 32.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
                         }
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(userPersona, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
@@ -154,7 +158,7 @@ fun SettingsScreen(
                     border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Column {
-                        SettingsRow(icon = Icons.Outlined.Category, title = "Manage Categories", onClick = { showNotImplemented() })
+                        SettingsRow(icon = Icons.Outlined.Category, title = "Manage Categories", onClick = onNavigateToCategories)
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                         SettingsRow(icon = Icons.Outlined.CreditCard, title = "Payment Methods", onClick = { showNotImplemented() })
                     }
@@ -191,6 +195,58 @@ fun SettingsScreen(
                 }
             }
 
+            // Data & Privacy Section
+            item {
+                SectionHeader("Data & Privacy")
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column {
+                        val currentExpenses by (expenses ?: kotlinx.coroutines.flow.MutableStateFlow(emptyList())).collectAsState()
+                        val currentCategories by (categories ?: kotlinx.coroutines.flow.MutableStateFlow(emptyList())).collectAsState()
+                        val context = androidx.compose.ui.platform.LocalContext.current
+
+                        val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                            contract = androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/csv")
+                        ) { uri ->
+                            if (uri != null) {
+                                coroutineScope.launch {
+                                    val result = com.ayaansaksham.spend_aware.utils.CsvExporter.exportExpensesToCsv(
+                                        context = context,
+                                        uri = uri,
+                                        expenses = currentExpenses,
+                                        categories = currentCategories
+                                    )
+                                    result.onSuccess { count ->
+                                        snackbarHostState.showSnackbar("Successfully exported $count expenses!")
+                                    }.onFailure {
+                                        snackbarHostState.showSnackbar("Failed to export: ${it.localizedMessage}")
+                                    }
+                                }
+                            }
+                        }
+
+                        SettingsRow(
+                            icon = Icons.Outlined.Download,
+                            title = "Export Data (CSV)",
+                            onClick = {
+                                if (currentExpenses.isEmpty()) {
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar("No transactions available to export.")
+                                    }
+                                } else {
+                                    val dateStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+                                    exportLauncher.launch("SpendAware_Export_$dateStr.csv")
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+
             // Display Section
             item {
                 SectionHeader("Display")
@@ -201,7 +257,37 @@ fun SettingsScreen(
                     border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Column {
-                        SettingsRow(icon = Icons.Outlined.DarkMode, title = "Dark Mode", value = "System", onClick = { showNotImplemented() })
+                        val themeMode by settingsViewModel.themeMode.collectAsState()
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "App Theme",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        SingleChoiceSegmentedButtonRow(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                        ) {
+                            SegmentedButton(
+                                selected = themeMode == "System",
+                                onClick = { settingsViewModel.updateThemeMode("System") },
+                                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3)
+                            ) { Text("System") }
+                            SegmentedButton(
+                                selected = themeMode == "Light",
+                                onClick = { settingsViewModel.updateThemeMode("Light") },
+                                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3)
+                            ) { Text("Light") }
+                            SegmentedButton(
+                                selected = themeMode == "Dark",
+                                onClick = { settingsViewModel.updateThemeMode("Dark") },
+                                shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3)
+                            ) { Text("Dark") }
+                        }
                     }
                 }
             }
@@ -216,6 +302,14 @@ fun SettingsScreen(
                     border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Column {
+                        SettingsRow(
+                            icon = Icons.Outlined.Logout,
+                            title = "Log Out",
+                            titleColor = MaterialTheme.colorScheme.error,
+                            onClick = onLogout,
+                            showChevron = false
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                         SettingsRow(
                             icon = Icons.Outlined.DeleteForever,
                             title = "Reset Budget",
@@ -287,7 +381,7 @@ fun SettingsSwitchRow(
     onCheckedChange: (Boolean) -> Unit
 ) {
     val thumbColor by androidx.compose.animation.animateColorAsState(
-        targetValue = if (checked) Color.White else Color(0xFFBCC9C5),
+        targetValue = if (checked) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.outline,
         label = "thumbColor"
     )
     val trackColor by androidx.compose.animation.animateColorAsState(

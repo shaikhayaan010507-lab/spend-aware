@@ -58,6 +58,7 @@ fun TransactionHistoryScreen(
     categories: StateFlow<List<Category>>? = null,
     budgets: StateFlow<List<com.ayaansaksham.spend_aware.data.local.entity.Budget>>? = null,
     onDeleteExpense: (Expense) -> Unit = {},
+    onEditExpense: (Expense) -> Unit = {},
     onNavigateBack: () -> Unit = {}
 ) {
     val expenseList by (expenses ?: kotlinx.coroutines.flow.MutableStateFlow(emptyList())).collectAsState()
@@ -96,7 +97,7 @@ fun TransactionHistoryScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF0F4F8)) // Slightly cool gray background for cleaner look
+            .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = 16.dp)
     ) {
         Spacer(modifier = Modifier.height(24.dp))
@@ -107,7 +108,7 @@ fun TransactionHistoryScreen(
                 .fillMaxWidth()
                 .height(48.dp)
                 .clip(RoundedCornerShape(24.dp))
-                .background(Color(0xFFE2E8F0)) // Softer gray for unselected
+                .background(MaterialTheme.colorScheme.surfaceVariant)
                 .padding(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -117,14 +118,14 @@ fun TransactionHistoryScreen(
                     .weight(1f)
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(20.dp))
-                    .background(if (isListView) Color(0xFF00695C) else Color.Transparent) // Dark teal for selected
+                    .background(if (isListView) MaterialTheme.colorScheme.primary else Color.Transparent)
                     .clickable { isListView = true },
                 contentAlignment = Alignment.Center
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.List, contentDescription = "List", tint = if (isListView) Color.White else Color.DarkGray, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.List, contentDescription = "List", tint = if (isListView) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Expense History", fontWeight = FontWeight.SemiBold, color = if (isListView) Color.White else Color.DarkGray, fontSize = 14.sp)
+                    Text("Expense History", fontWeight = FontWeight.SemiBold, color = if (isListView) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
                 }
             }
 
@@ -134,14 +135,14 @@ fun TransactionHistoryScreen(
                     .weight(1f)
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(20.dp))
-                    .background(if (!isListView) Color.White else Color.Transparent)
+                    .background(if (!isListView) MaterialTheme.colorScheme.primary else Color.Transparent)
                     .clickable { isListView = false },
                 contentAlignment = Alignment.Center
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.CalendarMonth, contentDescription = "Calendar", tint = if (!isListView) Color(0xFF1A1A1A) else Color.DarkGray, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.CalendarMonth, contentDescription = "Calendar", tint = if (!isListView) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Calendar View", fontWeight = FontWeight.SemiBold, color = if (!isListView) Color(0xFF1A1A1A) else Color.DarkGray, fontSize = 14.sp)
+                    Text("Calendar View", fontWeight = FontWeight.SemiBold, color = if (!isListView) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
                 }
             }
         }
@@ -162,7 +163,7 @@ fun TransactionHistoryScreen(
                 onCategoryChange = { selectedCategory = it }
             )
             Spacer(modifier = Modifier.height(16.dp))
-            ExpenseListView(filteredExpenses, categoryList, onDeleteExpense)
+            ExpenseListView(filteredExpenses, categoryList, onDeleteExpense, onEditExpense)
         } else {
             ExpenseCalendarView(expenseList, budgetList)
         }
@@ -187,10 +188,10 @@ fun QuickStatsRow(expenseList: List<Expense>, categoryList: List<Category>) {
             .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        StatCard(title = "TOTAL SPENT", value = "₹${totalSpent.toInt()}", valueColor = Color(0xFFD32F2F))
-        StatCard(title = "TRANSACTIONS", value = txText, valueColor = Color(0xFF1A1A1A))
-        StatCard(title = "AVERAGE / LOG", value = "₹${avgSpend.toInt()}", valueColor = Color(0xFF00796B))
-        StatCard(title = "TOP CATEGORY", value = topCategoryName, valueColor = Color(0xFF1A1A1A))
+        StatCard(title = "TOTAL SPENT", value = "₹${totalSpent.toInt()}", valueColor = MaterialTheme.colorScheme.error)
+        StatCard(title = "TRANSACTIONS", value = txText, valueColor = MaterialTheme.colorScheme.onSurface)
+        StatCard(title = "AVERAGE / LOG", value = "₹${avgSpend.toInt()}", valueColor = MaterialTheme.colorScheme.primary)
+        StatCard(title = "TOP CATEGORY", value = topCategoryName, valueColor = MaterialTheme.colorScheme.onSurface)
     }
 }
 
@@ -198,12 +199,13 @@ fun QuickStatsRow(expenseList: List<Expense>, categoryList: List<Category>) {
 fun StatCard(title: String, value: String, valueColor: Color) {
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.widthIn(min = 120.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(title, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.Gray, letterSpacing = 1.sp)
+            Text(title, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
             Spacer(modifier = Modifier.height(8.dp))
             Text(value, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = valueColor)
         }
@@ -226,8 +228,9 @@ fun FiltersSection(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             // Search Bar
@@ -237,13 +240,13 @@ fun FiltersSection(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
-                placeholder = { Text("Search expenses by note...", color = Color.Gray, fontSize = 14.sp) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.Gray) },
+                placeholder = { Text("Search expenses by note...", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                 colors = TextFieldDefaults.colors(
-                    unfocusedContainerColor = Color(0xFFF8F9FA),
-                    focusedContainerColor = Color(0xFFF8F9FA),
+                    unfocusedContainerColor = MaterialTheme.colorScheme.background,
+                    focusedContainerColor = MaterialTheme.colorScheme.background,
                     unfocusedIndicatorColor = Color.Transparent,
-                    focusedIndicatorColor = Color(0xFF00796B)
+                    focusedIndicatorColor = MaterialTheme.colorScheme.primary
                 ),
                 shape = RoundedCornerShape(25.dp),
                 singleLine = true
@@ -253,7 +256,7 @@ fun FiltersSection(
             
             // Period Filter
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("PERIOD:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                Text("PERIOD:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.width(8.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(periods) { period ->
@@ -261,7 +264,7 @@ fun FiltersSection(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(if (isSelected) Color(0xFF00695C) else Color.Transparent)
+                                .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
                                 .clickable { onPeriodChange(period) }
                                 .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
@@ -269,7 +272,7 @@ fun FiltersSection(
                                 period,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = if (isSelected) Color.White else Color.DarkGray
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -286,7 +289,7 @@ fun FiltersSection(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(if (isSelected) Color(0xFF1A1A1A) else Color(0xFFF8F9FA))
+                                .background(if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                                 .clickable { onCategoryChange(null) }
                                 .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
@@ -294,7 +297,7 @@ fun FiltersSection(
                                 "All Categories",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = if (isSelected) Color.White else Color.DarkGray
+                                color = if (isSelected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -303,7 +306,7 @@ fun FiltersSection(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(if (isSelected) Color(0xFF1A1A1A) else Color(0xFFF8F9FA))
+                                .background(if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                                 .clickable { onCategoryChange(cat) }
                                 .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
@@ -311,7 +314,7 @@ fun FiltersSection(
                                 cat.name,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = if (isSelected) Color.White else Color.DarkGray
+                                color = if (isSelected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -320,7 +323,7 @@ fun FiltersSection(
                  Text(
                     "No Categories Available",
                     fontSize = 12.sp,
-                    color = Color.Gray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 4.dp)
                 )
             }
@@ -330,10 +333,15 @@ fun FiltersSection(
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun ExpenseListView(expenseList: List<Expense>, categoryList: List<Category>, onDeleteExpense: (Expense) -> Unit) {
+fun ExpenseListView(
+    expenseList: List<Expense>,
+    categoryList: List<Category>,
+    onDeleteExpense: (Expense) -> Unit,
+    onEditExpense: (Expense) -> Unit
+) {
     if (expenseList.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No transactions yet.", color = Color.Gray)
+            Text("No transactions yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     } else {
         val categoryMap = categoryList.associateBy { it.categoryId }
@@ -366,13 +374,13 @@ fun ExpenseListView(expenseList: List<Expense>, categoryList: List<Category>, on
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color(0xFFF0F4F8))
+                            .background(MaterialTheme.colorScheme.background)
                             .padding(vertical = 12.dp, horizontal = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(dateString, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.DarkGray)
-                        Text("-₹${dailyTotal.toInt()}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                        Text(dateString, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                        Text("-₹${dailyTotal.toInt()}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
@@ -391,8 +399,8 @@ fun ExpenseListView(expenseList: List<Expense>, categoryList: List<Category>, on
                     val category = expense.categoryId?.let { categoryMap[it] }
                     val categoryName = category?.name ?: "Uncategorized"
                     val colorInt = safeParseColor(category?.colorHex)
-                    val categoryColor = if (colorInt != null) Color(colorInt) else Color(0xFFE0F2F1)
-                    val tintColor = if (colorInt != null) Color.White else Color(0xFF00796B)
+                    val categoryColor = if (colorInt != null) Color(colorInt) else MaterialTheme.colorScheme.primaryContainer
+                    val tintColor = if (colorInt != null) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onPrimaryContainer
                     val title = if (!expense.note.isNullOrBlank()) expense.note else categoryName
                     val timeStr = Instant.ofEpochMilli(expense.dateMillis).atZone(zoneId).format(timeFormatter)
 
@@ -408,14 +416,15 @@ fun ExpenseListView(expenseList: List<Expense>, categoryList: List<Category>, on
                                     .padding(horizontal = 20.dp),
                                 contentAlignment = Alignment.CenterEnd
                             ) {
-                                Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = Color.White)
+                                Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.onError)
                             }
                         },
                         content = {
                             Card(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier.fillMaxWidth().clickable { onEditExpense(expense) },
                                 shape = RoundedCornerShape(16.dp),
-                                colors = CardDefaults.cardColors(containerColor = Color.White),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                             ) {
                                 Row(
@@ -442,11 +451,11 @@ fun ExpenseListView(expenseList: List<Expense>, categoryList: List<Category>, on
                                     Spacer(modifier = Modifier.width(16.dp))
 
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A1A1A))
-                                        Text("$categoryName • $timeStr", fontSize = 12.sp, color = Color.Gray)
+                                        Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                                        Text("$categoryName • $timeStr", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
 
-                                    Text("-₹${expense.amount.toInt()}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A1A1A))
+                                    Text("-₹${expense.amount.toInt()}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
                                 }
                             }
                         }
@@ -506,10 +515,10 @@ fun ExpenseCalendarView(expenseList: List<Expense>, budgetList: List<com.ayaansa
         modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        LegendItem(Color(0xFFE6F4F2), "Under")
-        LegendItem(Color(0xFFFFF4E5), "75%+")
-        LegendItem(Color(0xFFFFDAD6), "90%+")
-        LegendItem(Color(0xFFBA1A1A), "Over")
+        LegendItem(MaterialTheme.colorScheme.primaryContainer, "Under")
+        LegendItem(MaterialTheme.colorScheme.secondaryContainer, "75%+")
+        LegendItem(MaterialTheme.colorScheme.errorContainer, "90%+")
+        LegendItem(MaterialTheme.colorScheme.error, "Over")
     }
 
     val daysOfWeek = listOf("S", "M", "T", "W", "T", "F", "S")
@@ -525,7 +534,7 @@ fun ExpenseCalendarView(expenseList: List<Expense>, budgetList: List<com.ayaansa
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Gray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
             }
@@ -551,14 +560,14 @@ fun ExpenseCalendarView(expenseList: List<Expense>, budgetList: List<com.ayaansa
                 val spent = dailyExpenses[day] ?: 0.0
                 
                 val (bgColor, textColor) = if (spent == 0.0) {
-                    Pair(Color.White, Color(0xFF1A1A1A))
+                    Pair(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.onSurface)
                 } else {
                     val utilization: Double = if (baselineDaily > 0) spent / baselineDaily else if (spent > 0) 2.0 else 0.0
                     when {
-                        utilization > 1.0 -> Pair(Color(0xFFBA1A1A), Color.White) // Over
-                        utilization >= 0.9 -> Pair(Color(0xFFFFDAD6), Color(0xFF1A1A1A)) // 90%+
-                        utilization >= 0.75 -> Pair(Color(0xFFFFF4E5), Color(0xFF1A1A1A)) // 75%+
-                        else -> Pair(Color(0xFFE6F4F2), Color(0xFF00685D)) // Under
+                        utilization > 1.0 -> Pair(MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.onError) // Over
+                        utilization >= 0.9 -> Pair(MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer) // 90%+
+                        utilization >= 0.75 -> Pair(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer) // 75%+
+                        else -> Pair(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer) // Under
                     }
                 }
 
@@ -569,7 +578,7 @@ fun ExpenseCalendarView(expenseList: List<Expense>, budgetList: List<com.ayaansa
                         .background(bgColor)
                         .border(
                             width = if (isToday) 2.dp else 1.dp,
-                            color = if (isToday) Color(0xFF00685D) else Color(0xFFF0F4F8),
+                            color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
                             shape = RoundedCornerShape(8.dp)
                         ),
                     contentAlignment = Alignment.Center
@@ -606,6 +615,6 @@ fun LegendItem(color: Color, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(color))
         Spacer(modifier = Modifier.width(4.dp))
-        Text(label, fontSize = 10.sp, fontWeight = FontWeight.Medium, color = Color.Gray)
+        Text(label, fontSize = 10.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

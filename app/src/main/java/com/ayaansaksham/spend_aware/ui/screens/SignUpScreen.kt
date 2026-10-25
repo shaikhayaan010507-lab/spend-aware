@@ -1,53 +1,72 @@
 package com.ayaansaksham.spend_aware.ui.screens
 
+import android.util.Patterns
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ayaansaksham.spend_aware.viewmodel.AuthState
+import com.ayaansaksham.spend_aware.viewmodel.AuthViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SignUpScreen(
+    authViewModel: AuthViewModel,
     onSignUpSuccess: () -> Unit,
-    onNavigateBack: () -> Unit
+    onNavigateToLogin: () -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Create Account", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
-            )
+    val authState by authViewModel.authState.collectAsState()
+
+    LaunchedEffect(authState) {
+        if (authState is AuthState.Success) {
+            onSignUpSuccess()
+            authViewModel.resetState()
         }
-    ) { paddingValues ->
+    }
+
+    // Validation
+    val isNameValid = name.isNotBlank()
+    val isEmailValid = Patterns.EMAIL_ADDRESS.matcher(email).matches()
+    val isPasswordValid = password.length >= 8 && password.any { it.isLetter() } && password.any { it.isDigit() }
+    val isConfirmValid = password == confirmPassword && confirmPassword.isNotEmpty()
+    
+    val formIsValid = isNameValid && isEmailValid && isPasswordValid && isConfirmValid
+    val isLoading = authState is AuthState.Loading
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .padding(paddingValues)
-                .padding(24.dp),
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            Spacer(modifier = Modifier.height(40.dp))
             Text(
                 text = "Join SpendAware",
                 fontSize = 28.sp,
@@ -56,60 +75,119 @@ fun SignUpScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Take control of your personal finances locally",
+                text = "Take control of your personal finances",
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
             )
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            // Name
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
                 label = { Text("Full Name") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Email
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
                 label = { Text("Email Address") },
                 singleLine = true,
+                isError = email.isNotEmpty() && !isEmailValid,
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                supportingText = { if (email.isNotEmpty() && !isEmailValid) Text("Invalid email format") }
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
+            // Password
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
                 label = { Text("Password") },
                 singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
+                isError = password.isNotEmpty() && !isPasswordValid,
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
+                trailingIcon = {
+                    val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(imageVector = image, contentDescription = "Toggle password visibility")
+                    }
+                },
+                supportingText = { if (password.isNotEmpty() && !isPasswordValid) Text("Must be 8+ chars with at least one letter and digit") }
             )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Confirm Password
+            OutlinedTextField(
+                value = confirmPassword,
+                onValueChange = { confirmPassword = it },
+                label = { Text("Confirm Password") },
+                singleLine = true,
+                isError = confirmPassword.isNotEmpty() && !isConfirmValid,
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                supportingText = { if (confirmPassword.isNotEmpty() && !isConfirmValid) Text("Passwords do not match") }
+            )
+
+            if (authState is AuthState.Error) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = (authState as AuthState.Error).message,
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 14.sp
+                )
+            }
 
             Spacer(modifier = Modifier.height(32.dp))
 
             Button(
                 onClick = {
-                    if (name.isNotBlank() && email.isNotBlank() && password.isNotBlank()) {
-                        onSignUpSuccess()
+                    if (formIsValid) {
+                        authViewModel.signUp(name, email, password)
                     }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(12.dp)
+                    .height(56.dp),
+                shape = RoundedCornerShape(12.dp),
+                enabled = formIsValid && !isLoading
             ) {
-                Text(text = "Sign Up", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                if (isLoading) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(24.dp))
+                } else {
+                    Text(text = "Create account", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
             }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+
+            TextButton(
+                onClick = {
+                    authViewModel.resetState()
+                    onNavigateToLogin()
+                }
+            ) {
+                Text("Already have an account? Log in", color = MaterialTheme.colorScheme.primary)
+            }
+            
+            Spacer(modifier = Modifier.height(40.dp))
         }
     }
 }

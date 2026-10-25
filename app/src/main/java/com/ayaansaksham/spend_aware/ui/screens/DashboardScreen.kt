@@ -79,7 +79,7 @@ fun DashboardScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F9FA))
+            .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = 16.dp)
             .verticalScroll(rememberScrollState())
     ) {
@@ -89,12 +89,12 @@ fun DashboardScreen(
             text = "Good Afternoon, $userName 👋",
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF1A1A1A)
+            color = MaterialTheme.colorScheme.onBackground
         )
         Text(
             text = todayString,
             fontSize = 14.sp,
-            color = Color.Gray,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp)
         )
 
@@ -238,7 +238,7 @@ fun DashboardScreen(
             text = "Quick Summary",
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF1A1A1A)
+            color = MaterialTheme.colorScheme.onBackground
         )
 
         Spacer(modifier = Modifier.height(12.dp))

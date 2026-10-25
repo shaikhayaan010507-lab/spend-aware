@@ -18,9 +18,22 @@ class SettingsViewModel(private val userPreferencesRepository: UserPreferencesRe
             initialValue = "Student"
         )
 
+    val themeMode: StateFlow<String> = userPreferencesRepository.themeModeFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = "System"
+        )
+
     fun updatePersona(newPersona: String) {
         viewModelScope.launch {
             userPreferencesRepository.saveUserPersona(newPersona)
+        }
+    }
+
+    fun updateThemeMode(mode: String) {
+        viewModelScope.launch {
+            userPreferencesRepository.saveThemeMode(mode)
         }
     }
 }

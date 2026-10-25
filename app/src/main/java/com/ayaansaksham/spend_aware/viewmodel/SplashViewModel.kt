@@ -6,31 +6,33 @@ import androidx.lifecycle.viewModelScope
 import com.ayaansaksham.spend_aware.data.repository.UserPreferencesRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 sealed class SplashState {
     object Loading : SplashState()
+    object NeedsAuth : SplashState()
     object NeedsSetup : SplashState()
     data class SetupComplete(val userName: String) : SplashState()
 }
 
 class SplashViewModel(private val userPreferencesRepository: UserPreferencesRepository) : ViewModel() {
 
-    val splashState: StateFlow<SplashState> = userPreferencesRepository.userNameFlow
-        .map { name ->
-            if (name.isNullOrBlank()) {
-                SplashState.NeedsSetup
-            } else {
-                SplashState.SetupComplete(name)
-            }
+    val splashState: StateFlow<SplashState> = combine(
+        userPreferencesRepository.isLoggedInFlow,
+        userPreferencesRepository.userNameFlow
+    ) { isLoggedIn, userName ->
+        when {
+            !isLoggedIn -> SplashState.NeedsAuth
+            userName.isNullOrBlank() -> SplashState.NeedsSetup
+            else -> SplashState.SetupComplete(userName)
         }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = SplashState.Loading
-        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = SplashState.Loading
+    )
 
     fun saveUserName(name: String) {
         viewModelScope.launch {

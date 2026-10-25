@@ -22,20 +22,25 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ayaansaksham.spend_aware.data.local.entity.Category
+import com.ayaansaksham.spend_aware.data.local.entity.Expense
 import kotlinx.coroutines.flow.StateFlow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryScreen(
     categories: StateFlow<List<Category>>,
+    expenses: StateFlow<List<Expense>>? = null,
+    currentProfileId: Int = 1,
     onAddCategory: (Category) -> Unit,
     onUpdateCategory: (Category) -> Unit = {},
     onDeleteCategory: (Category) -> Unit = {},
     onNavigateBack: () -> Unit
 ) {
     val categoryList by categories.collectAsState()
+    val expenseList by (expenses ?: kotlinx.coroutines.flow.MutableStateFlow(emptyList())).collectAsState()
 
     var showDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf<Category?>(null) }
     var categoryToEdit by remember { mutableStateOf<Category?>(null) }
 
     Scaffold(
@@ -81,7 +86,9 @@ fun CategoryScreen(
                         categoryToEdit = category
                         showDialog = true
                     },
-                    onDelete = { onDeleteCategory(category) }
+                    onDelete = { 
+                        showDeleteConfirmDialog = category 
+                    }
                 )
             }
 
@@ -92,20 +99,60 @@ fun CategoryScreen(
     if (showDialog) {
         CategoryDialog(
             category = categoryToEdit,
+            existingCategories = categoryList,
+            currentProfileId = currentProfileId,
             onDismiss = {
                 showDialog = false
                 categoryToEdit = null
             },
             onSave = { name, colorHex ->
                 if (categoryToEdit == null) {
-                    // Creating new
-                    onAddCategory(Category(name = name, colorHex = colorHex))
+                    onAddCategory(Category(name = name, colorHex = colorHex, profileId = currentProfileId))
                 } else {
-                    // Updating existing
                     onUpdateCategory(categoryToEdit!!.copy(name = name, colorHex = colorHex))
                 }
                 showDialog = false
                 categoryToEdit = null
+            }
+        )
+    }
+
+    if (showDeleteConfirmDialog != null) {
+        val categoryToDelete = showDeleteConfirmDialog!!
+        val orphanedExpensesCount = expenseList.count { it.categoryId == categoryToDelete.categoryId }
+        
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = null },
+            title = { Text("Delete Category?", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text("Are you sure you want to delete '${categoryToDelete.name}'?")
+                    if (orphanedExpensesCount > 0) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            "WARNING: This category is currently used by $orphanedExpensesCount expenses. Deleting it will mark those expenses as 'Uncategorized'.",
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDeleteCategory(categoryToDelete)
+                        showDeleteConfirmDialog = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmDialog = null }) {
+                    Text("Cancel")
+                }
             }
         )
     }
@@ -123,7 +170,7 @@ fun CategoryItem(
     val circleColor = try {
         Color(android.graphics.Color.parseColor(category.colorHex))
     } catch (e: Exception) {
-        Color.Gray // Fallback just in case
+        MaterialTheme.colorScheme.primary // Fallback just in case
     }
 
     Card(
@@ -188,6 +235,8 @@ fun CategoryItem(
 @Composable
 fun CategoryDialog(
     category: Category?,
+    existingCategories: List<Category>,
+    currentProfileId: Int,
     onDismiss: () -> Unit,
     onSave: (name: String, colorHex: String) -> Unit
 ) {
@@ -196,6 +245,17 @@ fun CategoryDialog(
     // A professional set of Material colors for the user to choose from
     val colorPalette = listOf("#F44336", "#E91E63", "#9C27B0", "#3F51B5", "#2196F3", "#00BCD4", "#4CAF50", "#FF9800", "#795548")
     var selectedColor by remember { mutableStateOf(category?.colorHex ?: colorPalette[0]) }
+
+    val nameTrimmed = name.trim()
+    val isNameEmpty = nameTrimmed.isEmpty()
+    val isNameTooLong = nameTrimmed.length > 20
+    val isNameDuplicate = existingCategories.any { 
+        it.name.equals(nameTrimmed, ignoreCase = true) && 
+        it.profileId == currentProfileId && 
+        it.categoryId != category?.categoryId 
+    }
+    
+    val isFormValid = !isNameEmpty && !isNameTooLong && !isNameDuplicate
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -207,6 +267,11 @@ fun CategoryDialog(
                     onValueChange = { name = it },
                     label = { Text("Category Name") },
                     singleLine = true,
+                    isError = isNameTooLong || isNameDuplicate,
+                    supportingText = {
+                        if (isNameTooLong) Text("Maximum 20 characters")
+                        else if (isNameDuplicate) Text("Category name already exists")
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -242,7 +307,8 @@ fun CategoryDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { if (name.isNotBlank()) onSave(name, selectedColor) }
+                onClick = { if (isFormValid) onSave(nameTrimmed, selectedColor) },
+                enabled = isFormValid
             ) { Text("Save") }
         },
         dismissButton = {

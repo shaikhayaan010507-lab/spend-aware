@@ -55,9 +55,14 @@ class ExpenseViewModel(
         }
     }
 
-    suspend fun checkAnomaly(expense: Expense, safeToSpendToday: Double, categoryName: String): com.ayaansaksham.spend_aware.domain.logic.RealTimeAnomalyResult {
+    suspend fun checkAnomaly(expense: Expense, safeToSpendToday: Double, categoryName: String, excludeExpenseId: Int? = null): com.ayaansaksham.spend_aware.domain.logic.RealTimeAnomalyResult {
         val currentProfileId = userSettingsRepository.settings.first()?.activeProfileId ?: 1
-        val history = repository.getCategoryAmounts(expense.categoryId ?: -1, currentProfileId)
+        
+        val history = if (excludeExpenseId != null) {
+            repository.getCategoryAmountsExcluding(expense.categoryId ?: -1, currentProfileId, excludeExpenseId)
+        } else {
+            repository.getCategoryAmounts(expense.categoryId ?: -1, currentProfileId)
+        }
         
         return com.ayaansaksham.spend_aware.domain.logic.ExpenseAnomalyDetector.detect(
             amount = expense.amount,

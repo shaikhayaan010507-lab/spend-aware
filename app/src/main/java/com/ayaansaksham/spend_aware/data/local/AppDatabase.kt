@@ -4,20 +4,44 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.ayaansaksham.spend_aware.data.local.dao.BudgetDao
 import com.ayaansaksham.spend_aware.data.local.dao.CategoryDao
 import com.ayaansaksham.spend_aware.data.local.dao.ExpenseDao
 import com.ayaansaksham.spend_aware.data.local.dao.SavingsGoalDao
 import com.ayaansaksham.spend_aware.data.local.dao.UserSettingsDao
+import com.ayaansaksham.spend_aware.data.local.dao.UserDao
 import com.ayaansaksham.spend_aware.data.local.entity.Budget
 import com.ayaansaksham.spend_aware.data.local.entity.Category
 import com.ayaansaksham.spend_aware.data.local.entity.Expense
 import com.ayaansaksham.spend_aware.data.local.entity.SavingsGoal
+import com.ayaansaksham.spend_aware.data.local.entity.User
 import com.ayaansaksham.spend_aware.data.local.entity.UserSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `users` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `fullName` TEXT NOT NULL, `email` TEXT NOT NULL, `passwordHash` TEXT NOT NULL, `salt` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)"
+        )
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_users_email` ON `users` (`email`)")
+    }
+}
+
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `categories_new` (`categoryId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `icon` TEXT, `colorHex` TEXT NOT NULL, `isDefault` INTEGER NOT NULL, `profileId` INTEGER NOT NULL)"
+        )
+        db.execSQL("INSERT INTO `categories_new` (`categoryId`, `name`, `icon`, `colorHex`, `isDefault`, `profileId`) SELECT `categoryId`, `name`, `icon`, `colorHex`, `isDefault`, `profileId` FROM `categories`")
+        db.execSQL("DROP TABLE `categories`")
+        db.execSQL("ALTER TABLE `categories_new` RENAME TO `categories`")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_categories_name_profileId` ON `categories` (`name`, `profileId`)")
+    }
+}
 
 @Database(
     entities = [
@@ -26,9 +50,10 @@ import kotlinx.coroutines.launch
         Budget::class,
         SavingsGoal::class,
         UserSettings::class,
-        com.ayaansaksham.spend_aware.data.local.entity.Profile::class
+        com.ayaansaksham.spend_aware.data.local.entity.Profile::class,
+        User::class
     ],
-    version = 6, // Bump to force destructive migration and wipe all presentation data
+    version = 8, // Bumped to 8, added categories migration
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -39,6 +64,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun savingsGoalDao(): SavingsGoalDao
     abstract fun userSettingsDao(): UserSettingsDao
     abstract fun profileDao(): com.ayaansaksham.spend_aware.data.local.dao.ProfileDao
+    abstract fun userDao(): UserDao
 
     companion object {
         @Volatile
@@ -51,7 +77,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "spend_aware_database"
                 )
-                    .fallbackToDestructiveMigration()
+                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8) // Explicit migrations
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
                             super.onCreate(db)
@@ -108,9 +134,6 @@ abstract class AppDatabase : RoomDatabase() {
 
                                 // 1. Master Budget (Salary) - Initialize to 0
                                 budgetDao.insertBudget(Budget(limitAmount = 0.0, periodType = "MONTHLY", startDateMillis = startOfMonth, categoryId = null, profileId = 2))
-                                
-                                // We are deliberately NOT inserting any Expenses or Fixed Budgets
-                                // This provides a completely clean slate for the user to start tracking.
                             }
                         }
                     })

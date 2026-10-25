@@ -400,12 +400,13 @@ fun DonutChart(
     totalSpent: Double
 ) {
     val fallbackColor = MaterialTheme.colorScheme.primary
+    val emptyColor = MaterialTheme.colorScheme.surfaceVariant
 
     Canvas(modifier = Modifier.size(180.dp)) {
         var startAngle = -90f
         if (totalSpent <= 0.0) {
             drawArc(
-                color = Color(0xFFE3F0F8),
+                color = emptyColor,
                 startAngle = 0f,
                 sweepAngle = 360f,
                 useCenter = false,
