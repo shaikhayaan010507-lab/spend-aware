@@ -13,6 +13,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material3.*
@@ -56,17 +58,19 @@ fun AnalyticsScreen(
 
     val zoneId = ZoneId.systemDefault()
     val today = LocalDate.now(zoneId)
-    val daysInMonth = YearMonth.of(today.year, today.month).lengthOfMonth()
+    var selectedYearMonth by remember { mutableStateOf(YearMonth.now(zoneId)) }
+
+    val daysInMonth = selectedYearMonth.lengthOfMonth()
 
     val currentMonthExpenses = allExpenses.filter {
         val expenseDate = Instant.ofEpochMilli(it.dateMillis).atZone(zoneId).toLocalDate()
-        expenseDate.year == today.year && expenseDate.month == today.month
+        expenseDate.year == selectedYearMonth.year && expenseDate.month == selectedYearMonth.month
     }
     
-    val lastMonth = today.minusMonths(1)
+    val previousMonth = selectedYearMonth.minusMonths(1)
     val lastMonthExpenses = allExpenses.filter {
         val expenseDate = Instant.ofEpochMilli(it.dateMillis).atZone(zoneId).toLocalDate()
-        expenseDate.year == lastMonth.year && expenseDate.month == lastMonth.month
+        expenseDate.year == previousMonth.year && expenseDate.month == previousMonth.month
     }
 
     val totalSpentCurrent = currentMonthExpenses.sumOf { it.amount }
@@ -78,11 +82,11 @@ fun AnalyticsScreen(
         0f
     }
     val diffText = if (percentageDiff > 0) {
-        "↑ ${String.format(Locale.getDefault(), "%.1f", percentageDiff)}% vs last mo"
+        "↑ ${String.format(Locale.getDefault(), "%.1f", percentageDiff)}% vs last month"
     } else if (percentageDiff < 0) {
-        "↓ ${String.format(Locale.getDefault(), "%.1f", -percentageDiff)}% vs last mo"
+        "↓ ${String.format(Locale.getDefault(), "%.1f", -percentageDiff)}% vs last month"
     } else {
-        "Same as last mo"
+        "Same as last month"
     }
     val diffColor = if (percentageDiff > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
 
@@ -139,33 +143,31 @@ fun AnalyticsScreen(
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Time Filter Tabs
-            val filters = listOf(
-                today.month.name.uppercase(Locale.getDefault()),
-                lastMonth.month.name.uppercase(Locale.getDefault()),
-                "Q3 TRENDS"
-            )
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(filters) { filter ->
-                    val isSelected = filter == filters[0] // Only active month is selected for now
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)
-                            .border(
-                                width = 1.dp,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                                shape = RoundedCornerShape(16.dp)
-                            )
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                    ) {
-                        Text(
-                            text = filter,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+            // Month Selector
+            val monthFormatter = remember { DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault()) }
+            val monthDisplay = remember(selectedYearMonth) { selectedYearMonth.format(monthFormatter).uppercase(Locale.getDefault()) }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { selectedYearMonth = selectedYearMonth.minusMonths(1) }) {
+                    Icon(Icons.Default.ChevronLeft, contentDescription = "Previous Month")
+                }
+                Text(
+                    text = monthDisplay,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                IconButton(onClick = { selectedYearMonth = selectedYearMonth.plusMonths(1) }) {
+                    Icon(Icons.Default.ChevronRight, contentDescription = "Next Month")
                 }
             }
 
@@ -352,38 +354,43 @@ fun AnalyticsScreen(
             }
 
             // Predictive Pacing Advisor Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier.size(32.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Outlined.Lightbulb, contentDescription = "Insight", tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(16.dp))
+            val behaviors = remember(allExpenses, categoryList) {
+                com.ayaansaksham.spend_aware.domain.logic.SpendingBehaviorClassifier.classify(allExpenses, categoryList)
+            }
+            val primaryBehavior = behaviors.firstOrNull()
+            
+            if (primaryBehavior != null) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier.size(32.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Outlined.Lightbulb, contentDescription = "Insight", tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(16.dp))
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(text = "PREDICTIVE PACING ADVISOR", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = MaterialTheme.colorScheme.secondary, letterSpacing = 1.sp)
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(text = "PREDICTIVE PACING ADVISOR", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = MaterialTheme.colorScheme.secondary, letterSpacing = 1.sp)
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        "You spend 32% more on Friday evenings. Consider allocating ₹500 from your flexible buffer for this weekend to stay on track.",
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = { /* Apply Buffer Rule */ },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Apply Buffer rule", fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = primaryBehavior.title,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = primaryBehavior.description,
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }

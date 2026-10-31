@@ -106,30 +106,17 @@ fun AddExpenseScreen(
     // Calculate Safe to Spend Today
     val zoneId = ZoneId.systemDefault()
     val today = LocalDate.now(zoneId)
-    val daysInMonth = YearMonth.of(today.year, today.month).lengthOfMonth()
-    val daysRemaining = daysInMonth - today.dayOfMonth + 1
 
-    val masterBudget = remember(budgetList) { budgetList.find { it.categoryId == null } }
-    val fixedBudgets = remember(budgetList) { budgetList.filter { it.isFixed } }
-    val totalIncome = masterBudget?.limitAmount ?: 0.0
-    val totalFixed = fixedBudgets.sumOf { it.limitAmount }
-    val fixedCategoryIds = fixedBudgets.mapNotNull { it.categoryId }.toSet()
-
-    val flexibleExpensesThisMonth = expenseList.filter { expense ->
-        val expenseDate = Instant.ofEpochMilli(expense.dateMillis).atZone(zoneId).toLocalDate()
-        expenseDate.year == today.year && expenseDate.month == today.month && expense.categoryId !in fixedCategoryIds
+    val safeToSpend = remember(budgetList, expenseList, today) {
+        com.ayaansaksham.spend_aware.domain.logic.SafeToSpendCalculator.calculate(
+            budgets = budgetList,
+            expenses = expenseList,
+            today = today,
+            zoneId = zoneId
+        )
     }
-    val spentThisMonth = flexibleExpensesThisMonth.sumOf { it.amount }
-    
-    // UI default savings goal (0.0) used here to match dashboard behavior
-    val flexibleBudget = (totalIncome - totalFixed - 0.0).coerceAtLeast(0.0)
-    val monthlyPool = (flexibleBudget - spentThisMonth).coerceAtLeast(0.0)
-    val dailyLimit = if (daysRemaining > 0) monthlyPool / daysRemaining else 0.0
 
-    // Payment method state
-    val paymentMethods = listOf("UPI / Google Pay", "Credit Card", "Debit Card", "Cash", "Net Banking")
-    var selectedPaymentMethod by rememberSaveable { mutableStateOf(paymentMethods[0]) }
-    var paymentDropdownExpanded by remember { mutableStateOf(false) }
+    val dailyLimit = safeToSpend.dailyLimit
 
     // Quick add chips
     val quickAddValues = listOf(100, 250, 500, 1000)
@@ -302,82 +289,31 @@ fun AddExpenseScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Date and Payment Method Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            // Date Picker Card
+            OutlinedCard(
+                onClick = { showDatePicker = true },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
-                // Date Picker Button
-                OutlinedCard(
-                    onClick = { showDatePicker = true },
-                    modifier = Modifier.weight(1f).height(56.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+                Row(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.CalendarToday,
-                            contentDescription = "Date",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        val dateLabel = Instant.ofEpochMilli(selectedDateMillis).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("MMM dd"))
-                        Text(
-                            text = dateLabel,
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-
-                // Payment Method Dropdown
-                Box(modifier = Modifier.weight(1.5f).height(56.dp)) {
-                    OutlinedCard(
-                        onClick = { paymentDropdownExpanded = true },
-                        modifier = Modifier.fillMaxSize(),
-                        shape = RoundedCornerShape(12.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                        colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = selectedPaymentMethod,
-                                fontSize = 14.sp,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Icon(
-                                imageVector = Icons.Outlined.ArrowDropDown,
-                                contentDescription = "Select Payment Method",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    DropdownMenu(
-                        expanded = paymentDropdownExpanded,
-                        onDismissRequest = { paymentDropdownExpanded = false }
-                    ) {
-                        paymentMethods.forEach { method ->
-                            DropdownMenuItem(
-                                text = { Text(method) },
-                                onClick = {
-                                    selectedPaymentMethod = method
-                                    paymentDropdownExpanded = false
-                                }
-                            )
-                        }
-                    }
+                    Icon(
+                        imageVector = Icons.Outlined.CalendarToday,
+                        contentDescription = "Date",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    val dateLabel = Instant.ofEpochMilli(selectedDateMillis).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))
+                    Text(
+                        text = dateLabel,
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 }
             }
             

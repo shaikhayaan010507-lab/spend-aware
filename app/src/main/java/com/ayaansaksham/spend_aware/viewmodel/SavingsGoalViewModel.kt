@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.ayaansaksham.spend_aware.data.local.entity.SavingsGoal
 import com.ayaansaksham.spend_aware.data.repository.SavingsGoalRepository
-import com.ayaansaksham.spend_aware.data.repository.UserSettingsRepository
+import com.ayaansaksham.spend_aware.data.repository.UserPreferencesRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,12 +17,10 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalCoroutinesApi::class)
 class SavingsGoalViewModel(
     private val repository: SavingsGoalRepository,
-    private val userSettingsRepository: UserSettingsRepository
+    private val userPreferencesRepository: UserPreferencesRepository
 ) : ViewModel() {
 
-    private val activeProfileId = userSettingsRepository.settings.flatMapLatest { settings ->
-        kotlinx.coroutines.flow.flowOf(settings?.activeProfileId ?: 1)
-    }
+    private val activeProfileId = userPreferencesRepository.activeProfileIdFlow
 
     val allGoals: StateFlow<List<SavingsGoal>> = activeProfileId
         .flatMapLatest { profileId ->
@@ -36,28 +34,32 @@ class SavingsGoalViewModel(
 
     fun addGoal(goal: SavingsGoal) {
         viewModelScope.launch {
-            val profileId = userSettingsRepository.settings.first()?.activeProfileId ?: 1
-            repository.insertGoal(goal.copy(profileId = profileId))
+            val currentProfileId = userPreferencesRepository.activeProfileIdFlow.first()
+            repository.insertGoal(goal.copy(profileId = currentProfileId))
         }
     }
 
     fun updateGoal(goal: SavingsGoal) {
-        viewModelScope.launch { repository.updateGoal(goal) }
+        viewModelScope.launch {
+            repository.updateGoal(goal)
+        }
     }
 
     fun deleteGoal(goal: SavingsGoal) {
-        viewModelScope.launch { repository.deleteGoal(goal) }
+        viewModelScope.launch {
+            repository.deleteGoal(goal)
+        }
     }
 }
 
 class SavingsGoalViewModelFactory(
     private val repository: SavingsGoalRepository,
-    private val userSettingsRepository: UserSettingsRepository
+    private val userPreferencesRepository: UserPreferencesRepository
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SavingsGoalViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return SavingsGoalViewModel(repository, userSettingsRepository) as T
+            return SavingsGoalViewModel(repository, userPreferencesRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

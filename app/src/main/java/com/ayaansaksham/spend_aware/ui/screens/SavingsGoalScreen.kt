@@ -12,6 +12,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ayaansaksham.spend_aware.data.local.entity.SavingsGoal
 import kotlinx.coroutines.flow.StateFlow
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -36,10 +39,13 @@ fun SavingsGoalScreen(
     goals: StateFlow<List<SavingsGoal>>,
     onAddGoal: (SavingsGoal) -> Unit,
     onUpdateGoal: (SavingsGoal) -> Unit,
+    onDeleteGoal: (SavingsGoal) -> Unit = {},
     onNavigateBack: () -> Unit
 ) {
     val goalList by goals.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
+    var editingGoal by remember { mutableStateOf<SavingsGoal?>(null) }
+    var deletingGoal by remember { mutableStateOf<SavingsGoal?>(null) }
     var addFundsGoal by remember { mutableStateOf<SavingsGoal?>(null) }
 
     Scaffold(
@@ -108,7 +114,12 @@ fun SavingsGoalScreen(
                     contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp)
                 ) {
                     items(goalList) { goal ->
-                        SavingsGoalCard(goal = goal, onAddFundsClick = { addFundsGoal = goal })
+                        SavingsGoalCard(
+                            goal = goal,
+                            onAddFundsClick = { addFundsGoal = goal },
+                            onEditClick = { editingGoal = goal },
+                            onDeleteClick = { deletingGoal = goal }
+                        )
                         Spacer(modifier = Modifier.height(16.dp))
                     }
                 }
@@ -117,11 +128,60 @@ fun SavingsGoalScreen(
     }
 
     if (showAddDialog) {
-        AddGoalDialog(
+        GoalDialog(
+            existingGoal = null,
             onDismiss = { showAddDialog = false },
-            onConfirm = { title, target ->
-                onAddGoal(SavingsGoal(title = title, targetAmount = target, savedAmount = 0.0))
+            onConfirm = { title, targetAmount, targetDateMillis ->
+                onAddGoal(
+                    SavingsGoal(
+                        title = title,
+                        targetAmount = targetAmount,
+                        savedAmount = 0.0,
+                        targetDateMillis = targetDateMillis
+                    )
+                )
                 showAddDialog = false
+            }
+        )
+    }
+
+    editingGoal?.let { goal ->
+        GoalDialog(
+            existingGoal = goal,
+            onDismiss = { editingGoal = null },
+            onConfirm = { title, targetAmount, targetDateMillis ->
+                onUpdateGoal(
+                    goal.copy(
+                        title = title,
+                        targetAmount = targetAmount,
+                        targetDateMillis = targetDateMillis
+                    )
+                )
+                editingGoal = null
+            }
+        )
+    }
+
+    deletingGoal?.let { goal ->
+        AlertDialog(
+            onDismissRequest = { deletingGoal = null },
+            title = { Text("Delete Savings Goal", fontWeight = FontWeight.Bold) },
+            text = { Text("Are you sure you want to delete '${goal.title}'?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDeleteGoal(goal)
+                        deletingGoal = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingGoal = null }) {
+                    Text("Cancel")
+                }
             }
         )
     }
@@ -139,20 +199,28 @@ fun SavingsGoalScreen(
 }
 
 @Composable
-fun SavingsGoalCard(goal: SavingsGoal, onAddFundsClick: () -> Unit) {
+fun SavingsGoalCard(
+    goal: SavingsGoal,
+    onAddFundsClick: () -> Unit,
+    onEditClick: () -> Unit,
+    onDeleteClick: () -> Unit
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+
     val targetProgress = if (goal.targetAmount > 0) {
         (goal.savedAmount / goal.targetAmount).toFloat().coerceIn(0f, 1f)
     } else 0f
 
-    // Smoothly animate the progress bar filling up
     val animatedProgress by animateFloatAsState(
         targetValue = targetProgress,
         animationSpec = tween(durationMillis = 1000),
         label = "progressAnimation"
     )
 
-    // Turn green if the goal is completed
-    val progressColor = if (targetProgress >= 1f) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary
+    val progressColor = MaterialTheme.colorScheme.primary
+
+    val dateFormat = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
+    val targetDateStr = goal.targetDateMillis?.let { dateFormat.format(Date(it)) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -181,13 +249,53 @@ fun SavingsGoalCard(goal: SavingsGoal, onAddFundsClick: () -> Unit) {
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    if (targetDateStr != null) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Target Date: $targetDateStr",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
-                Text(
-                    text = "${(targetProgress * 100).toInt()}%",
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 18.sp,
-                    color = progressColor
-                )
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "${(targetProgress * 100).toInt()}%",
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 18.sp,
+                        color = progressColor
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Box {
+                        IconButton(
+                            onClick = { menuExpanded = true },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Options", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        DropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Edit Goal") },
+                                onClick = {
+                                    menuExpanded = false
+                                    onEditClick()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                                onClick = {
+                                    menuExpanded = false
+                                    onDeleteClick()
+                                }
+                            )
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -220,29 +328,41 @@ fun SavingsGoalCard(goal: SavingsGoal, onAddFundsClick: () -> Unit) {
 }
 
 @Composable
-fun AddGoalDialog(onDismiss: () -> Unit, onConfirm: (title: String, target: Double) -> Unit) {
-    var title by remember { mutableStateOf("") }
-    var targetText by remember { mutableStateOf("") }
+fun GoalDialog(
+    existingGoal: SavingsGoal?,
+    onDismiss: () -> Unit,
+    onConfirm: (title: String, targetAmount: Double, targetDateMillis: Long?) -> Unit
+) {
+    var title by remember { mutableStateOf(existingGoal?.title ?: "") }
+    var targetText by remember { mutableStateOf(existingGoal?.targetAmount?.let { if (it % 1 == 0.0) it.toInt().toString() else it.toString() } ?: "") }
     val focusManager = LocalFocusManager.current
+
+    val dialogTitle = if (existingGoal == null) "New Savings Goal" else "Edit Savings Goal"
+
+    val target = targetText.toDoubleOrNull()
+    val isTitleValid = title.isNotBlank() && title.length <= 30
+    val isTargetValid = target != null && target > 0
+    val isValid = isTitleValid && isTargetValid
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("New Savings Goal", fontWeight = FontWeight.Bold) },
+        title = { Text(dialogTitle, fontWeight = FontWeight.Bold) },
         text = {
             Column {
                 OutlinedTextField(
                     value = title,
-                    onValueChange = { title = it },
+                    onValueChange = { if (it.length <= 30) title = it },
                     label = { Text("Goal name") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     singleLine = true,
+                    supportingText = { Text("${title.length}/30") },
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Words,
                         imeAction = ImeAction.Next
                     )
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = targetText,
                     onValueChange = { input ->
@@ -264,10 +384,11 @@ fun AddGoalDialog(onDismiss: () -> Unit, onConfirm: (title: String, target: Doub
         confirmButton = {
             TextButton(
                 onClick = {
-                    val target = targetText.toDoubleOrNull()
-                    if (title.isNotBlank() && target != null && target > 0) onConfirm(title.trim(), target)
+                    if (target != null) {
+                        onConfirm(title.trim(), target, existingGoal?.targetDateMillis)
+                    }
                 },
-                enabled = title.isNotBlank() && targetText.toDoubleOrNull() != null
+                enabled = isValid
             ) { Text("Save Goal", fontWeight = FontWeight.Bold) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }

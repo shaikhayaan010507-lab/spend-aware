@@ -22,7 +22,6 @@ data class Expense(
     val categoryId: Int?,
     val note: String? = null,
     val dateMillis: Long,
-    val isRecurring: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val profileId: Int = 1
 )

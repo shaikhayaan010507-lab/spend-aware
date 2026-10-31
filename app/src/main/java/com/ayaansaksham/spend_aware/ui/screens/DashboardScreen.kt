@@ -50,31 +50,29 @@ fun DashboardScreen(
     val todayString = today.format(dateFormatter)
     val zoneId = ZoneId.systemDefault()
 
-    val totalMonthlyBudget = budgetList.filter { it.categoryId == null }.sumOf { it.limitAmount }
-    
-    // Determine Fixed Commitments
-    val fixedBudgets = budgetList.filter { it.isFixed }
-    val fixedCategoryIds = fixedBudgets.mapNotNull { it.categoryId }.toSet()
-    val totalFixedCommitments = fixedBudgets.sumOf { it.limitAmount }
+    val fixedCategoryIds = remember(budgetList) { budgetList.filter { it.isFixed }.mapNotNull { it.categoryId }.toSet() }
 
-    // Date-filtered flexible expense totals (ignores fixed bills)
-    val flexibleExpensesThisMonth = expenseList.filter { expense ->
-        val expenseDate = Instant.ofEpochMilli(expense.dateMillis).atZone(zoneId).toLocalDate()
-        expenseDate.year == today.year && expenseDate.month == today.month && expense.categoryId !in fixedCategoryIds
+    val safeToSpend = remember(budgetList, expenseList, today) {
+        com.ayaansaksham.spend_aware.domain.logic.SafeToSpendCalculator.calculate(
+            budgets = budgetList,
+            expenses = expenseList,
+            today = today,
+            zoneId = zoneId
+        )
     }
-    val spentThisMonth = flexibleExpensesThisMonth.sumOf { it.amount }
 
-    val todayFlexibleExpenses = expenseList.filter { expense ->
-        val expenseDate = Instant.ofEpochMilli(expense.dateMillis).atZone(zoneId).toLocalDate()
-        expenseDate == today && expense.categoryId !in fixedCategoryIds
+    val flexibleBudget = safeToSpend.flexibleBudget
+    val monthlyPool = safeToSpend.monthlyPool
+    val dailyLimit = safeToSpend.dailyLimit
+    val spentToday = safeToSpend.spentToday
+    val progress = safeToSpend.progress
+
+    val currentHour = java.time.LocalTime.now(zoneId).hour
+    val greeting = when (currentHour) {
+        in 5..11 -> "Good Morning"
+        in 12..16 -> "Good Afternoon"
+        else -> "Good Evening"
     }
-    val spentToday = todayFlexibleExpenses.sumOf { it.amount }
-
-    // Math: Safe to Spend Pool = (Total Allowance - Fixed Commitments) - Spent Flexible Money
-    val flexibleBudget = (totalMonthlyBudget - totalFixedCommitments).coerceAtLeast(0.0)
-    val monthlyPool = (flexibleBudget - spentThisMonth).coerceAtLeast(0.0)
-    val dailyLimit = if (daysRemaining > 0) monthlyPool / daysRemaining else 0.0
-    val progress = if (dailyLimit > 0) (spentToday.toFloat() / dailyLimit.toFloat()).coerceIn(0f, 1f) else 0f
 
     Column(
         modifier = Modifier
@@ -86,7 +84,7 @@ fun DashboardScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
         Text(
-            text = "Good Afternoon, $userName 👋",
+            text = "$greeting, $userName 👋",
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground

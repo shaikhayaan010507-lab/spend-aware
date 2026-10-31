@@ -36,6 +36,7 @@ import kotlinx.coroutines.launch
 import com.ayaansaksham.spend_aware.data.local.entity.Budget
 import com.ayaansaksham.spend_aware.data.local.entity.Category
 import com.ayaansaksham.spend_aware.data.local.entity.Expense
+import com.ayaansaksham.spend_aware.data.local.entity.SavingsGoal
 import com.ayaansaksham.spend_aware.domain.logic.BurnRateResult
 import kotlinx.coroutines.flow.StateFlow
 import java.time.Instant
@@ -55,11 +56,21 @@ fun BudgetScreen(
     onNavigateBack: () -> Unit,
     // Injecting expenses to calculate accurate spent/remaining exactly like Dashboard
     expenses: StateFlow<List<Expense>>? = null,
-    currentProfileId: Int = 1
+    currentProfileId: Int = 1,
+    savingsGoals: StateFlow<List<SavingsGoal>>? = null,
+    onAddSavingsGoal: (SavingsGoal) -> Unit = {},
+    onUpdateSavingsGoal: (SavingsGoal) -> Unit = {},
+    onDeleteSavingsGoal: (SavingsGoal) -> Unit = {}
 ) {
     val budgetList by budgets.collectAsState()
     val categoryList by categories.collectAsState()
     val expenseList by (expenses ?: kotlinx.coroutines.flow.MutableStateFlow(emptyList())).collectAsState()
+    val goalList by (savingsGoals ?: kotlinx.coroutines.flow.MutableStateFlow(emptyList())).collectAsState()
+
+    var showAddGoalDialog by remember { mutableStateOf(false) }
+    var editingGoal by remember { mutableStateOf<SavingsGoal?>(null) }
+    var deletingGoal by remember { mutableStateOf<SavingsGoal?>(null) }
+    var addFundsGoal by remember { mutableStateOf<SavingsGoal?>(null) }
 
     val zoneId = ZoneId.systemDefault()
     val today = LocalDate.now(zoneId)
@@ -96,12 +107,6 @@ fun BudgetScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     
-    val showNotImplemented = {
-        coroutineScope.launch {
-            snackbarHostState.showSnackbar("This feature is coming soon in V2!")
-        }
-    }
-
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -137,17 +142,17 @@ fun BudgetScreen(
                             val incomeLabel = if (currentProfileId == 1) "Allowance" else "Income"
                             val fixedLabel = if (currentProfileId == 1) "Fixed Deductions" else "Fixed Expenses"
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Column(modifier = Modifier.weight(1f)) {
+                                Column(modifier = Modifier.weight(1f).clickable { showIncomeDialog = true }) {
                                     Text(incomeLabel, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text("₹${totalIncome.toInt()}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
                                 }
-                                Column(modifier = Modifier.weight(1f)) {
+                                Column(modifier = Modifier.weight(1f).clickable { showFixedExpenseDialog = true }) {
                                     Text(fixedLabel, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text("₹${totalFixed.toInt()}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
                                 }
-                                Column(modifier = Modifier.weight(1f)) {
+                                Column(modifier = Modifier.weight(1f).clickable { showSavingsGoalDialog = true }) {
                                     Text("Savings Goal", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text("₹${totalSavings.toInt()}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
@@ -280,61 +285,6 @@ fun BudgetScreen(
                     }
                 }
 
-                // BUDGET CONFIGURATION
-                item {
-                    Text("Budget Configuration", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    val incomeLabel = if (currentProfileId == 1) "Daily Floor" else "Daily Floor"
-                    val fixedLabel = if (currentProfileId == 1) "Rollover Rule" else "Rollover Rule"
-                    val savingsLabel = if (currentProfileId == 1) "Weekend Boost" else "Weekend Boost"
-                    val rulesLabel = if (currentProfileId == 1) "Hard Ceiling" else "Hard Ceiling"
-
-                    androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
-                        columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(2),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                        modifier = Modifier.fillMaxWidth().height(220.dp) // Fixed height to fit the 2x2 grid
-                    ) {
-                        item {
-                            ConfigTile(
-                                icon = Icons.Outlined.AccountBalanceWallet,
-                                label = incomeLabel,
-                                value = "₹500",
-                                onClick = { showNotImplemented() },
-                                indicatorColor = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        item {
-                            ConfigTile(
-                                icon = Icons.Outlined.Lock,
-                                label = fixedLabel,
-                                value = "Active",
-                                onClick = { showNotImplemented() },
-                                indicatorColor = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        item {
-                            ConfigTile(
-                                icon = Icons.Outlined.Star,
-                                label = savingsLabel,
-                                value = "Disabled",
-                                onClick = { showNotImplemented() },
-                                indicatorColor = MaterialTheme.colorScheme.outlineVariant
-                            )
-                        }
-                        item {
-                            ConfigTile(
-                                icon = Icons.Default.TrendingDown,
-                                label = rulesLabel,
-                                value = "₹10,000",
-                                onClick = { showNotImplemented() },
-                                indicatorColor = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
-                }
-
                 // FIXED COMMITMENTS SECTION (USING BUDGET ENTITY)
                 item {
                     Text("Fixed Recurring Outflows", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground)
@@ -409,6 +359,68 @@ fun BudgetScreen(
                             Text("+ Add Fixed Commitment", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // SAVINGS GOALS SECTION
+                    Text("Savings Goals", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground)
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    if (goalList.isEmpty()) {
+                        Text(
+                            "No savings goals yet.",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            goalList.forEach { goal ->
+                                SavingsGoalCard(
+                                    goal = goal,
+                                    onAddFundsClick = { addFundsGoal = goal },
+                                    onEditClick = { editingGoal = goal },
+                                    onDeleteClick = { deletingGoal = goal }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Add Savings Goal Button (Same style as + Add Fixed Commitment)
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showAddGoalDialog = true },
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.Transparent,
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "+ Add Savings Goal",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                 }
                 
                 // INTELLIGENCE FOOTER CARD
@@ -456,7 +468,8 @@ fun BudgetScreen(
                         categoryId = null,
                         limitAmount = amount,
                         periodType = masterBudget?.periodType ?: "MONTHLY",
-                        startDateMillis = masterBudget?.startDateMillis ?: System.currentTimeMillis()
+                        startDateMillis = masterBudget?.startDateMillis ?: System.currentTimeMillis(),
+                        profileId = currentProfileId
                     )
                 )
                 showIncomeDialog = false
@@ -498,6 +511,77 @@ fun BudgetScreen(
                 // Updating local state so the UI reacts instantly for the presentation
                 displaySavingsTarget = amount
                 showSavingsGoalDialog = false
+            }
+        )
+    }
+
+    if (showAddGoalDialog) {
+        GoalDialog(
+            existingGoal = null,
+            onDismiss = { showAddGoalDialog = false },
+            onConfirm = { title, targetAmount, targetDateMillis ->
+                onAddSavingsGoal(
+                    SavingsGoal(
+                        title = title,
+                        targetAmount = targetAmount,
+                        savedAmount = 0.0,
+                        targetDateMillis = targetDateMillis,
+                        profileId = currentProfileId
+                    )
+                )
+                showAddGoalDialog = false
+            }
+        )
+    }
+
+    editingGoal?.let { goal ->
+        GoalDialog(
+            existingGoal = goal,
+            onDismiss = { editingGoal = null },
+            onConfirm = { title, targetAmount, targetDateMillis ->
+                onUpdateSavingsGoal(
+                    goal.copy(
+                        title = title,
+                        targetAmount = targetAmount,
+                        targetDateMillis = targetDateMillis
+                    )
+                )
+                editingGoal = null
+            }
+        )
+    }
+
+    deletingGoal?.let { goal ->
+        AlertDialog(
+            onDismissRequest = { deletingGoal = null },
+            title = { Text("Delete Savings Goal", fontWeight = FontWeight.Bold) },
+            text = { Text("Are you sure you want to delete '${goal.title}'?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDeleteSavingsGoal(goal)
+                        deletingGoal = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingGoal = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    addFundsGoal?.let { goal ->
+        AddFundsDialog(
+            goal = goal,
+            onDismiss = { addFundsGoal = null },
+            onConfirm = { amountToAdd ->
+                onUpdateSavingsGoal(goal.copy(savedAmount = goal.savedAmount + amountToAdd))
+                addFundsGoal = null
             }
         )
     }

@@ -19,6 +19,7 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
     private val USER_PERSONA_KEY = stringPreferencesKey("user_persona")
     private val IS_LOGGED_IN_KEY = booleanPreferencesKey("is_logged_in")
     private val USER_ID_KEY = intPreferencesKey("user_id")
+    private val ACTIVE_PROFILE_ID_KEY = intPreferencesKey("active_profile_id")
     private val THEME_MODE_KEY = stringPreferencesKey("theme_mode")
 
     val userNameFlow: Flow<String?> = dataStore.data.map { preferences ->
@@ -31,6 +32,14 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
 
     val isLoggedInFlow: Flow<Boolean> = dataStore.data.map { preferences ->
         preferences[IS_LOGGED_IN_KEY] ?: false
+    }
+
+    val userIdFlow: Flow<Int?> = dataStore.data.map { preferences ->
+        preferences[USER_ID_KEY]
+    }
+
+    val activeProfileIdFlow: Flow<Int> = dataStore.data.map { preferences ->
+        preferences[ACTIVE_PROFILE_ID_KEY] ?: 1
     }
 
     val themeModeFlow: Flow<String> = dataStore.data.map { preferences ->
@@ -55,11 +64,18 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
         }
     }
 
-    suspend fun saveLoginSession(userId: Int, fullName: String) {
+    suspend fun saveLoginSession(userId: Int, fullName: String, activeProfileId: Int) {
         dataStore.edit { preferences ->
             preferences[IS_LOGGED_IN_KEY] = true
             preferences[USER_ID_KEY] = userId
             preferences[USER_NAME_KEY] = fullName
+            preferences[ACTIVE_PROFILE_ID_KEY] = activeProfileId
+        }
+    }
+
+    suspend fun updateActiveProfileId(activeProfileId: Int) {
+        dataStore.edit { preferences ->
+            preferences[ACTIVE_PROFILE_ID_KEY] = activeProfileId
         }
     }
 
@@ -67,9 +83,8 @@ class UserPreferencesRepository(private val dataStore: DataStore<Preferences>) {
         dataStore.edit { preferences ->
             preferences.remove(IS_LOGGED_IN_KEY)
             preferences.remove(USER_ID_KEY)
-            // Leave user_persona intact so the DB doesn't suddenly fail, 
-            // but remove user_name so ProfileSetup triggers if they make a new acc
-            preferences.remove(USER_NAME_KEY) 
+            preferences.remove(USER_NAME_KEY)
+            preferences.remove(ACTIVE_PROFILE_ID_KEY)
         }
     }
 }

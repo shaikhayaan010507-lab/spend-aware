@@ -12,6 +12,11 @@ data class BehaviorTrait(
 
 object SpendingBehaviorClassifier {
 
+    const val WEEKEND_SPEND_RATIO_THRESHOLD = 0.45
+    const val FOOD_SPEND_RATIO_THRESHOLD = 0.40
+    const val FREQUENT_SMALL_TICKET_THRESHOLD = 150.0
+    const val CONSERVATIVE_SPEND_THRESHOLD = 2000.0
+
     fun classify(expenses: List<Expense>, categories: List<Category>): List<BehaviorTrait> {
         if (expenses.isEmpty()) return emptyList()
 
@@ -26,7 +31,7 @@ object SpendingBehaviorClassifier {
             dayOfWeek == Calendar.SATURDAY || dayOfWeek == Calendar.SUNDAY
         }.sumOf { it.amount }
 
-        if (totalSpent > 0 && (weekendSpent / totalSpent) >= 0.45) {
+        if (totalSpent > 0 && (weekendSpent / totalSpent) >= WEEKEND_SPEND_RATIO_THRESHOLD) {
             traits.add(
                 BehaviorTrait(
                     title = "Weekend Spender",
@@ -44,7 +49,7 @@ object SpendingBehaviorClassifier {
         }.map { it.categoryId }
 
         val foodSpent = expenses.filter { it.categoryId in foodCategoryIds }.sumOf { it.amount }
-        if (totalSpent > 0 && (foodSpent / totalSpent) >= 0.40) {
+        if (totalSpent > 0 && (foodSpent / totalSpent) >= FOOD_SPEND_RATIO_THRESHOLD) {
             traits.add(
                 BehaviorTrait(
                     title = "High Food Spender",
@@ -56,7 +61,7 @@ object SpendingBehaviorClassifier {
 
         // 3. Frequent Small Spender Check
         val averageExpense = totalSpent / totalCount
-        if (totalCount >= 5 && averageExpense < 150.0) {
+        if (totalCount >= 5 && averageExpense < FREQUENT_SMALL_TICKET_THRESHOLD) {
             traits.add(
                 BehaviorTrait(
                     title = "Frequent Small Spender",
@@ -67,7 +72,7 @@ object SpendingBehaviorClassifier {
         }
 
         // 4. Conservative Spender Check
-        if (totalCount <= 5 && totalSpent < 2000.0) {
+        if (totalCount <= 5 && totalSpent < CONSERVATIVE_SPEND_THRESHOLD) {
             traits.add(
                 BehaviorTrait(
                     title = "Conservative Spender",

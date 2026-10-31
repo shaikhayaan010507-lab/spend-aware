@@ -9,15 +9,15 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.ayaansaksham.spend_aware.data.local.dao.BudgetDao
 import com.ayaansaksham.spend_aware.data.local.dao.CategoryDao
 import com.ayaansaksham.spend_aware.data.local.dao.ExpenseDao
+import com.ayaansaksham.spend_aware.data.local.dao.ProfileDao
 import com.ayaansaksham.spend_aware.data.local.dao.SavingsGoalDao
-import com.ayaansaksham.spend_aware.data.local.dao.UserSettingsDao
 import com.ayaansaksham.spend_aware.data.local.dao.UserDao
 import com.ayaansaksham.spend_aware.data.local.entity.Budget
 import com.ayaansaksham.spend_aware.data.local.entity.Category
 import com.ayaansaksham.spend_aware.data.local.entity.Expense
+import com.ayaansaksham.spend_aware.data.local.entity.Profile
 import com.ayaansaksham.spend_aware.data.local.entity.SavingsGoal
 import com.ayaansaksham.spend_aware.data.local.entity.User
-import com.ayaansaksham.spend_aware.data.local.entity.UserSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -43,17 +43,62 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
     }
 }
 
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // 1. Add activeProfileId column to existing users table from v7
+        db.execSQL("ALTER TABLE `users` ADD COLUMN `activeProfileId` INTEGER NOT NULL DEFAULT 1")
+
+        // 2. Ensure baseline User #1 exists for any pre-migration profiles/expenses
+        db.execSQL(
+            "INSERT OR IGNORE INTO `users` (`id`, `fullName`, `email`, `passwordHash`, `salt`, `activeProfileId`, `createdAt`) " +
+            "VALUES (1, 'Ayaan', 'default@spendaware.local', '', '', 1, 1700000000000)"
+        )
+
+        // 3. Recreate profiles table with userId and FK
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `profiles_new` (" +
+            "`profileId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+            "`name` TEXT NOT NULL, " +
+            "`role` TEXT NOT NULL, " +
+            "`userId` INTEGER NOT NULL DEFAULT 1, " +
+            "FOREIGN KEY(`userId`) REFERENCES `users`(`id`) ON DELETE CASCADE)"
+        )
+        db.execSQL("INSERT INTO `profiles_new` (`profileId`, `name`, `role`, `userId`) SELECT `profileId`, `name`, `role`, 1 FROM `profiles`")
+        db.execSQL("DROP TABLE `profiles`")
+        db.execSQL("ALTER TABLE `profiles_new` RENAME TO `profiles`")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_profiles_userId` ON `profiles` (`userId`)")
+
+        // 4. Recreate expenses table without isRecurring
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `expenses_new` (" +
+            "`expenseId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+            "`amount` REAL NOT NULL, " +
+            "`categoryId` INTEGER, " +
+            "`note` TEXT, " +
+            "`dateMillis` INTEGER NOT NULL, " +
+            "`createdAt` INTEGER NOT NULL, " +
+            "`profileId` INTEGER NOT NULL DEFAULT 1, " +
+            "FOREIGN KEY(`categoryId`) REFERENCES `categories`(`categoryId`) ON DELETE SET_NULL)"
+        )
+        db.execSQL("INSERT INTO `expenses_new` (`expenseId`, `amount`, `categoryId`, `note`, `dateMillis`, `createdAt`, `profileId`) SELECT `expenseId`, `amount`, `categoryId`, `note`, `dateMillis`, `createdAt`, `profileId` FROM `expenses`")
+        db.execSQL("DROP TABLE `expenses`")
+        db.execSQL("ALTER TABLE `expenses_new` RENAME TO `expenses`")
+
+        // 5. Drop user_settings table
+        db.execSQL("DROP TABLE IF EXISTS `user_settings`")
+    }
+}
+
 @Database(
     entities = [
         Category::class,
         Expense::class,
         Budget::class,
         SavingsGoal::class,
-        UserSettings::class,
-        com.ayaansaksham.spend_aware.data.local.entity.Profile::class,
+        Profile::class,
         User::class
     ],
-    version = 8, // Bumped to 8, added categories migration
+    version = 9, // Bumped to 9, multi-user schema update
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -62,8 +107,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun expenseDao(): ExpenseDao
     abstract fun budgetDao(): BudgetDao
     abstract fun savingsGoalDao(): SavingsGoalDao
-    abstract fun userSettingsDao(): UserSettingsDao
-    abstract fun profileDao(): com.ayaansaksham.spend_aware.data.local.dao.ProfileDao
+    abstract fun profileDao(): ProfileDao
     abstract fun userDao(): UserDao
 
     companion object {
@@ -77,66 +121,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "spend_aware_database"
                 )
-                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8) // Explicit migrations
-                    .addCallback(object : Callback() {
-                        override fun onCreate(db: SupportSQLiteDatabase) {
-                            super.onCreate(db)
-                            CoroutineScope(Dispatchers.IO).launch {
-                                val dbInstance = getDatabase(context)
-                                val profileDao = dbInstance.profileDao()
-                                val categoryDao = dbInstance.categoryDao()
-                                val userSettingsDao = dbInstance.userSettingsDao()
-                                val budgetDao = dbInstance.budgetDao()
-
-                                // Create UserSettings (Defaults to Profile 1)
-                                userSettingsDao.insertOrUpdateSettings(UserSettings(id = 1, firebaseUid = "local_only", activeProfileId = 1))
-
-                                // Create Profiles
-                                val p1 = com.ayaansaksham.spend_aware.data.local.entity.Profile(profileId = 1, name = "Ayaan", role = "STUDENT")
-                                val p2 = com.ayaansaksham.spend_aware.data.local.entity.Profile(profileId = 2, name = "John Doe", role = "EMPLOYEE")
-                                profileDao.insertProfile(p1)
-                                profileDao.insertProfile(p2)
-
-                                // --- CATEGORIES ---
-                                // Categories for Student (Profile 1)
-                                categoryDao.insertCategory(Category(categoryId = 1, name = "Canteen", colorHex = "#00685D", isDefault = true, profileId = 1))
-                                categoryDao.insertCategory(Category(categoryId = 2, name = "Commute", colorHex = "#F89C00", isDefault = true, profileId = 1))
-                                categoryDao.insertCategory(Category(categoryId = 3, name = "Stationery", colorHex = "#6D7A77", isDefault = true, profileId = 1))
-                                categoryDao.insertCategory(Category(categoryId = 4, name = "Events", colorHex = "#875200", isDefault = true, profileId = 1))
-                                categoryDao.insertCategory(Category(categoryId = 5, name = "Hostel Fees", colorHex = "#B02528", isDefault = true, profileId = 1))
-
-                                // Categories for Employee (Profile 2)
-                                categoryDao.insertCategory(Category(categoryId = 6, name = "Groceries", colorHex = "#16A34A", isDefault = true, profileId = 2))
-                                categoryDao.insertCategory(Category(categoryId = 7, name = "Rent", colorHex = "#B02528", isDefault = true, profileId = 2))
-                                categoryDao.insertCategory(Category(categoryId = 8, name = "Fuel", colorHex = "#F89C00", isDefault = true, profileId = 2))
-                                categoryDao.insertCategory(Category(categoryId = 9, name = "Investments", colorHex = "#008376", isDefault = true, profileId = 2))
-                                categoryDao.insertCategory(Category(categoryId = 10, name = "Dining", colorHex = "#00685D", isDefault = true, profileId = 2))
-
-                                // --- HELPER DATES ---
-                                val startOfMonth = java.util.Calendar.getInstance().apply {
-                                    set(java.util.Calendar.DAY_OF_MONTH, 1)
-                                    set(java.util.Calendar.HOUR_OF_DAY, 0)
-                                    set(java.util.Calendar.MINUTE, 0)
-                                    set(java.util.Calendar.SECOND, 0)
-                                    set(java.util.Calendar.MILLISECOND, 0)
-                                }.timeInMillis
-
-                                // ==========================================
-                                // INJECT EMPTY BASELINE FOR PROFILE 1
-                                // ==========================================
-
-                                // 1. Master Budget (Allowance) - Initialize to 0 so the UI isn't broken
-                                budgetDao.insertBudget(Budget(limitAmount = 0.0, periodType = "MONTHLY", startDateMillis = startOfMonth, categoryId = null, profileId = 1))
-                                
-                                // ==========================================
-                                // INJECT EMPTY BASELINE FOR PROFILE 2
-                                // ==========================================
-
-                                // 1. Master Budget (Salary) - Initialize to 0
-                                budgetDao.insertBudget(Budget(limitAmount = 0.0, periodType = "MONTHLY", startDateMillis = startOfMonth, categoryId = null, profileId = 2))
-                            }
-                        }
-                    })
+                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9) // Explicit migrations
                     .build()
                 INSTANCE = instance
                 instance

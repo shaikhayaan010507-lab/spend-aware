@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.ayaansaksham.spend_aware.data.local.entity.Category
 import com.ayaansaksham.spend_aware.data.repository.CategoryRepository
-import com.ayaansaksham.spend_aware.data.repository.UserSettingsRepository
+import com.ayaansaksham.spend_aware.data.repository.UserPreferencesRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,12 +17,10 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalCoroutinesApi::class)
 class CategoryViewModel(
     private val repository: CategoryRepository,
-    private val userSettingsRepository: UserSettingsRepository
+    private val userPreferencesRepository: UserPreferencesRepository
 ) : ViewModel() {
 
-    private val activeProfileId = userSettingsRepository.settings.flatMapLatest { settings ->
-        kotlinx.coroutines.flow.flowOf(settings?.activeProfileId ?: 1)
-    }
+    private val activeProfileId = userPreferencesRepository.activeProfileIdFlow
 
     val allCategories: StateFlow<List<Category>> = activeProfileId
         .flatMapLatest { profileId ->
@@ -36,8 +34,8 @@ class CategoryViewModel(
 
     fun addCategory(category: Category) {
         viewModelScope.launch {
-            val profileId = userSettingsRepository.settings.first()?.activeProfileId ?: 1
-            repository.insertCategory(category.copy(profileId = profileId))
+            val currentProfileId = userPreferencesRepository.activeProfileIdFlow.first()
+            repository.insertCategory(category.copy(profileId = currentProfileId))
         }
     }
 
@@ -52,12 +50,12 @@ class CategoryViewModel(
 
 class CategoryViewModelFactory(
     private val repository: CategoryRepository,
-    private val userSettingsRepository: UserSettingsRepository
+    private val userPreferencesRepository: UserPreferencesRepository
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(CategoryViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return CategoryViewModel(repository, userSettingsRepository) as T
+            return CategoryViewModel(repository, userPreferencesRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

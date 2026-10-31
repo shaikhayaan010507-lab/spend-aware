@@ -11,4 +11,12 @@ class UserRepository(private val userDao: UserDao) {
     suspend fun getUserByEmail(email: String): User? {
         return userDao.getUserByEmail(email)
     }
+
+    suspend fun getUserById(userId: Int): User? {
+        return userDao.getUserById(userId)
+    }
+
+    suspend fun updateActiveProfileId(userId: Int, activeProfileId: Int) {
+        userDao.updateActiveProfileId(userId, activeProfileId)
+    }
 }

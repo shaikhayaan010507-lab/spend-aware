@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
@@ -13,17 +14,13 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.collectAsState
-import com.ayaansaksham.spend_aware.data.repository.dataStore
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -33,16 +30,24 @@ import com.ayaansaksham.spend_aware.data.repository.BudgetRepository
 import com.ayaansaksham.spend_aware.data.repository.CategoryRepository
 import com.ayaansaksham.spend_aware.data.repository.ExpenseRepository
 import com.ayaansaksham.spend_aware.data.repository.SavingsGoalRepository
+import com.ayaansaksham.spend_aware.data.repository.UserPreferencesRepository
+import com.ayaansaksham.spend_aware.data.repository.UserRepository
+import com.ayaansaksham.spend_aware.data.repository.dataStore
 import com.ayaansaksham.spend_aware.ui.Screen
 import com.ayaansaksham.spend_aware.ui.screens.AddExpenseScreen
 import com.ayaansaksham.spend_aware.ui.screens.AnalyticsScreen
 import com.ayaansaksham.spend_aware.ui.screens.BudgetScreen
 import com.ayaansaksham.spend_aware.ui.screens.CategoryScreen
 import com.ayaansaksham.spend_aware.ui.screens.DashboardScreen
+import com.ayaansaksham.spend_aware.ui.screens.LoginScreen
+import com.ayaansaksham.spend_aware.ui.screens.ProfileSetupScreen
 import com.ayaansaksham.spend_aware.ui.screens.SavingsGoalScreen
+import com.ayaansaksham.spend_aware.ui.screens.SettingsScreen
 import com.ayaansaksham.spend_aware.ui.screens.SignUpScreen
 import com.ayaansaksham.spend_aware.ui.screens.TransactionHistoryScreen
 import com.ayaansaksham.spend_aware.ui.theme.SpendawareTheme
+import com.ayaansaksham.spend_aware.viewmodel.AuthViewModel
+import com.ayaansaksham.spend_aware.viewmodel.AuthViewModelFactory
 import com.ayaansaksham.spend_aware.viewmodel.BudgetViewModel
 import com.ayaansaksham.spend_aware.viewmodel.BudgetViewModelFactory
 import com.ayaansaksham.spend_aware.viewmodel.CategoryViewModel
@@ -51,8 +56,14 @@ import com.ayaansaksham.spend_aware.viewmodel.ExpenseViewModel
 import com.ayaansaksham.spend_aware.viewmodel.ExpenseViewModelFactory
 import com.ayaansaksham.spend_aware.viewmodel.SavingsGoalViewModel
 import com.ayaansaksham.spend_aware.viewmodel.SavingsGoalViewModelFactory
+import com.ayaansaksham.spend_aware.viewmodel.SettingsViewModel
+import com.ayaansaksham.spend_aware.viewmodel.SettingsViewModelFactory
 import com.ayaansaksham.spend_aware.viewmodel.SplashState
-import androidx.compose.ui.unit.dp
+import com.ayaansaksham.spend_aware.viewmodel.SplashViewModel
+import com.ayaansaksham.spend_aware.viewmodel.SplashViewModelFactory
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 // Data class to define the bottom navigation tabs
 data class BottomNavItem(val title: String, val icon: ImageVector, val route: String)
@@ -62,7 +73,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            val userPreferencesRepository = remember { com.ayaansaksham.spend_aware.data.repository.UserPreferencesRepository(applicationContext.dataStore) }
+            val userPreferencesRepository = remember { UserPreferencesRepository(applicationContext.dataStore) }
             val themeMode by userPreferencesRepository.themeModeFlow.collectAsState(initial = "System")
             
             val isDarkTheme = when (themeMode) {
@@ -74,27 +85,38 @@ class MainActivity : ComponentActivity() {
             SpendawareTheme(darkTheme = isDarkTheme) {
                 val database = remember { AppDatabase.getDatabase(applicationContext) }
 
-                val userSettingsRepository = remember { com.ayaansaksham.spend_aware.data.repository.UserSettingsRepository(database.userSettingsDao()) }
-
-                val splashViewModel: com.ayaansaksham.spend_aware.viewmodel.SplashViewModel = viewModel(factory = com.ayaansaksham.spend_aware.viewmodel.SplashViewModelFactory(userPreferencesRepository))
+                val splashViewModel: SplashViewModel = viewModel(factory = SplashViewModelFactory(userPreferencesRepository))
                 val splashState by splashViewModel.splashState.collectAsState()
 
                 val expenseRepository = remember { ExpenseRepository(database.expenseDao()) }
-                val expenseViewModel: ExpenseViewModel = viewModel(factory = ExpenseViewModelFactory(expenseRepository, userSettingsRepository))
+                val expenseViewModel: ExpenseViewModel = viewModel(factory = ExpenseViewModelFactory(expenseRepository, userPreferencesRepository))
 
                 val categoryRepository = remember { CategoryRepository(database.categoryDao()) }
-                val categoryViewModel: CategoryViewModel = viewModel(factory = CategoryViewModelFactory(categoryRepository, userSettingsRepository))
+                val categoryViewModel: CategoryViewModel = viewModel(factory = CategoryViewModelFactory(categoryRepository, userPreferencesRepository))
 
                 val budgetRepository = remember { BudgetRepository(database.budgetDao()) }
-                val budgetViewModel: BudgetViewModel = viewModel(factory = BudgetViewModelFactory(budgetRepository, expenseRepository, userSettingsRepository))
+                val budgetViewModel: BudgetViewModel = viewModel(factory = BudgetViewModelFactory(budgetRepository, expenseRepository, userPreferencesRepository))
 
                 val savingsGoalRepository = remember { SavingsGoalRepository(database.savingsGoalDao()) }
-                val savingsGoalViewModel: SavingsGoalViewModel = viewModel(factory = SavingsGoalViewModelFactory(savingsGoalRepository, userSettingsRepository))
+                val savingsGoalViewModel: SavingsGoalViewModel = viewModel(factory = SavingsGoalViewModelFactory(savingsGoalRepository, userPreferencesRepository))
 
-                val userRepository = remember { com.ayaansaksham.spend_aware.data.repository.UserRepository(database.userDao()) }
-                val authViewModel: com.ayaansaksham.spend_aware.viewmodel.AuthViewModel = viewModel(
-                    factory = com.ayaansaksham.spend_aware.viewmodel.AuthViewModelFactory(userRepository, userPreferencesRepository)
+                val userRepository = remember { UserRepository(database.userDao()) }
+                val authViewModel: AuthViewModel = viewModel(
+                    factory = AuthViewModelFactory(
+                        userRepository,
+                        database.profileDao(),
+                        database.categoryDao(),
+                        database.budgetDao(),
+                        userPreferencesRepository
+                    )
                 )
+
+                val settingsViewModel: SettingsViewModel = viewModel(
+                    factory = SettingsViewModelFactory(userRepository, database.profileDao(), userPreferencesRepository)
+                )
+
+                val activeProfileId by userPreferencesRepository.activeProfileIdFlow.collectAsState(initial = 1)
+                val storedUserName by userPreferencesRepository.userNameFlow.collectAsState(initial = "Ayaan")
 
                 val navController = rememberNavController()
 
@@ -114,217 +136,209 @@ class MainActivity : ComponentActivity() {
                 // Only show bottom bar on main tabs (hide on SignUp, Login, and AddExpense)
                 val showBottomBar = bottomNavItems.any { it.route == currentRoute }
 
-                if (splashState is com.ayaansaksham.spend_aware.viewmodel.SplashState.Loading) {
+                if (splashState is SplashState.Loading) {
                     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                         // Empty loading screen
                     }
                 } else {
                     Scaffold(
-                    bottomBar = {
-                        if (showBottomBar) {
-                            NavigationBar(tonalElevation = 8.dp) {
-                                bottomNavItems.forEach { item ->
-                                    NavigationBarItem(
-                                        selected = currentRoute == item.route,
-                                        onClick = {
-                                            navController.navigate(item.route) {
-                                                popUpTo(Screen.Dashboard.route) { saveState = true }
-                                                launchSingleTop = true
-                                                restoreState = true
-                                            }
-                                        },
-                                        icon = { Icon(item.icon, contentDescription = item.title) },
-                                        label = { Text(item.title) },
-                                        alwaysShowLabel = false
-                                    )
+                        bottomBar = {
+                            if (showBottomBar) {
+                                NavigationBar(tonalElevation = 8.dp) {
+                                    bottomNavItems.forEach { item ->
+                                        NavigationBarItem(
+                                            selected = currentRoute == item.route,
+                                            onClick = {
+                                                navController.navigate(item.route) {
+                                                    popUpTo(Screen.Dashboard.route) { saveState = true }
+                                                    launchSingleTop = true
+                                                    restoreState = true
+                                                }
+                                            },
+                                            icon = { Icon(item.icon, contentDescription = item.title) },
+                                            label = { Text(item.title) },
+                                            alwaysShowLabel = false
+                                        )
+                                    }
                                 }
                             }
-                        }
-                    },
-                    floatingActionButton = {
-                        if (currentRoute == Screen.Dashboard.route || currentRoute == Screen.ExpenseHistory.route) {
-                            FloatingActionButton(
-                                onClick = { navController.navigate(Screen.AddExpense.route) },
-                                containerColor = MaterialTheme.colorScheme.primaryContainer
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = "Add Expense")
-                            }
-                        }
-                    },
-                    floatingActionButtonPosition = FabPosition.End
-                ) { innerPadding ->
-
-                    NavHost(
-                        navController = navController,
-                        startDestination = when (splashState) {
-                            is com.ayaansaksham.spend_aware.viewmodel.SplashState.NeedsAuth -> Screen.Login.route
-                            is com.ayaansaksham.spend_aware.viewmodel.SplashState.NeedsSetup -> Screen.ProfileSetup.route
-                            else -> Screen.Dashboard.route
                         },
-                        modifier = Modifier.padding(innerPadding) // This prevents content from hiding behind the bottom bar
-                    ) {
-                        composable(Screen.Login.route) {
-                            com.ayaansaksham.spend_aware.ui.screens.LoginScreen(
-                                authViewModel = authViewModel,
-                                onLoginSuccess = {
-                                    navController.navigate(Screen.Dashboard.route) {
-                                        popUpTo(0) { inclusive = true }
-                                    }
-                                },
-                                onNavigateToSignUp = {
-                                    navController.navigate(Screen.SignUp.route)
+                        floatingActionButton = {
+                            if (currentRoute == Screen.Dashboard.route || currentRoute == Screen.ExpenseHistory.route) {
+                                FloatingActionButton(
+                                    onClick = { navController.navigate(Screen.AddExpense.route) },
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = "Add Expense")
                                 }
-                            )
-                        }
-                        composable(Screen.SignUp.route) {
-                            com.ayaansaksham.spend_aware.ui.screens.SignUpScreen(
-                                authViewModel = authViewModel,
-                                onSignUpSuccess = {
-                                    navController.navigate(Screen.Dashboard.route) {
-                                        popUpTo(0) { inclusive = true }
+                            }
+                        },
+                        floatingActionButtonPosition = FabPosition.End
+                    ) { innerPadding ->
+
+                        NavHost(
+                            navController = navController,
+                            startDestination = when (splashState) {
+                                is SplashState.NeedsAuth -> Screen.Login.route
+                                is SplashState.NeedsSetup -> Screen.ProfileSetup.route
+                                else -> Screen.Dashboard.route
+                            },
+                            modifier = Modifier.padding(innerPadding)
+                        ) {
+                            composable(Screen.Login.route) {
+                                LoginScreen(
+                                    authViewModel = authViewModel,
+                                    onLoginSuccess = {
+                                        navController.navigate(Screen.Dashboard.route) {
+                                            popUpTo(0) { inclusive = true }
+                                        }
+                                    },
+                                    onNavigateToSignUp = {
+                                        navController.navigate(Screen.SignUp.route)
                                     }
-                                },
-                                onNavigateToLogin = {
-                                    navController.popBackStack()
-                                }
-                            )
-                        }
-                        composable(Screen.ProfileSetup.route) {
-                            com.ayaansaksham.spend_aware.ui.screens.ProfileSetupScreen(
-                                onSaveName = { name -> splashViewModel.saveUserName(name) },
-                                onNameSaved = {
-                                    navController.navigate(Screen.Dashboard.route) {
-                                        popUpTo(Screen.ProfileSetup.route) { inclusive = true }
+                                )
+                            }
+                            composable(Screen.SignUp.route) {
+                                SignUpScreen(
+                                    authViewModel = authViewModel,
+                                    onSignUpSuccess = {
+                                        navController.navigate(Screen.Dashboard.route) {
+                                            popUpTo(0) { inclusive = true }
+                                        }
+                                    },
+                                    onNavigateToLogin = {
+                                        navController.popBackStack()
                                     }
-                                }
-                            )
-                        }
+                                )
+                            }
+                            composable(Screen.ProfileSetup.route) {
+                                ProfileSetupScreen(
+                                    onSaveName = { name -> splashViewModel.saveUserName(name) },
+                                    onNameSaved = {
+                                        navController.navigate(Screen.Dashboard.route) {
+                                            popUpTo(Screen.ProfileSetup.route) { inclusive = true }
+                                        }
+                                    }
+                                )
+                            }
 
-                        composable(Screen.Dashboard.route) {
-                            DashboardScreen(
-                                userName = (splashState as? SplashState.SetupComplete)
-                                    ?.userName ?: "Ayaan",
-                                expenses = expenseViewModel.allExpenses,
-                                budgets = budgetViewModel.allBudgets
-                            )
-                        }
+                            composable(Screen.Dashboard.route) {
+                                val currentExpenses by expenseViewModel.allExpenses.collectAsState() // TEMP wipe - remove later
+                                androidx.compose.runtime.LaunchedEffect(currentExpenses) { // TEMP wipe - remove later
+                                    currentExpenses.forEach { expenseViewModel.deleteExpense(it) } // TEMP wipe - remove later
+                                } // TEMP wipe - remove later
 
-                        composable(Screen.Analytics.route) {
-                            AnalyticsScreen(
-                                expenses = expenseViewModel.allExpenses,
-                                categories = categoryViewModel.allCategories,
-                                budgets = budgetViewModel.allBudgets,
-                                onNavigateBack = { navController.popBackStack() }
-                            )
-                        }
+                                DashboardScreen(
+                                    userName = storedUserName ?: "Ayaan",
+                                    expenses = expenseViewModel.allExpenses,
+                                    budgets = budgetViewModel.allBudgets
+                                )
+                            }
 
-                        composable(
-                            route = Screen.AddExpense.route,
-                            arguments = listOf(androidx.navigation.navArgument("expenseId") { type = androidx.navigation.NavType.StringType; nullable = true })
-                        ) { backStackEntry ->
-                            val userSettings by userSettingsRepository.settings.collectAsState(initial = null)
-                            val activeProfileId = userSettings?.activeProfileId ?: 1
-                            val expenseIdStr = backStackEntry.arguments?.getString("expenseId")
-                            val expenseIdToEdit = expenseIdStr?.toIntOrNull()
+                            composable(Screen.Analytics.route) {
+                                AnalyticsScreen(
+                                    expenses = expenseViewModel.allExpenses,
+                                    categories = categoryViewModel.allCategories,
+                                    budgets = budgetViewModel.allBudgets,
+                                    onNavigateBack = { navController.popBackStack() }
+                                )
+                            }
 
-                            AddExpenseScreen(
-                                categories = categoryViewModel.allCategories,
-                                budgets = budgetViewModel.allBudgets,
-                                expenses = expenseViewModel.allExpenses,
-                                currentProfileId = activeProfileId,
-                                expenseIdToEdit = expenseIdToEdit,
-                                onSaveExpense = { expense -> expenseViewModel.addExpense(expense) },
-                                onUpdateExpense = { expense -> expenseViewModel.updateExpense(expense) },
-                                onAddCategory = { category -> categoryViewModel.addCategory(category) },
-                                onCheckAnomaly = { expense, dailyLimit, catName, excludeId ->
-                                    expenseViewModel.checkAnomaly(expense, dailyLimit, catName, excludeId)
-                                },
-                                onNavigateBack = { navController.popBackStack() }
-                            )
-                        }
+                            composable(
+                                route = Screen.AddExpense.route,
+                                arguments = listOf(androidx.navigation.navArgument("expenseId") { type = androidx.navigation.NavType.StringType; nullable = true })
+                            ) { backStackEntry ->
+                                val expenseIdStr = backStackEntry.arguments?.getString("expenseId")
+                                val expenseIdToEdit = expenseIdStr?.toIntOrNull()
 
-                        composable(Screen.Categories.route) {
-                            val userSettings by userSettingsRepository.settings.collectAsState(initial = null)
-                            val activeProfileId = userSettings?.activeProfileId ?: 1
-                            
-                            CategoryScreen(
-                                categories = categoryViewModel.allCategories,
-                                expenses = expenseViewModel.allExpenses,
-                                currentProfileId = activeProfileId,
-                                onAddCategory = { category -> categoryViewModel.addCategory(category) },
-                                onUpdateCategory = { category -> categoryViewModel.updateCategory(category) },
-                                onDeleteCategory = { category -> categoryViewModel.deleteCategory(category) },
-                                onNavigateBack = { navController.popBackStack() }
-                            )
-                        }
+                                AddExpenseScreen(
+                                    categories = categoryViewModel.allCategories,
+                                    budgets = budgetViewModel.allBudgets,
+                                    expenses = expenseViewModel.allExpenses,
+                                    currentProfileId = activeProfileId,
+                                    expenseIdToEdit = expenseIdToEdit,
+                                    onSaveExpense = { expense -> expenseViewModel.addExpense(expense) },
+                                    onUpdateExpense = { expense -> expenseViewModel.updateExpense(expense) },
+                                    onAddCategory = { category -> categoryViewModel.addCategory(category) },
+                                    onCheckAnomaly = { expense, dailyLimit, catName, excludeId ->
+                                        expenseViewModel.checkAnomaly(expense, dailyLimit, catName, excludeId)
+                                    },
+                                    onNavigateBack = { navController.popBackStack() }
+                                )
+                            }
 
-                        composable(Screen.ExpenseHistory.route) {
-                            TransactionHistoryScreen(
-                                expenses = expenseViewModel.allExpenses,
-                                categories = categoryViewModel.allCategories,
-                                budgets = budgetViewModel.allBudgets,
-                                onDeleteExpense = { expense -> expenseViewModel.deleteExpense(expense) },
-                                onNavigateBack = { navController.popBackStack() }
-                            )
-                        }
+                            composable(Screen.Categories.route) {
+                                CategoryScreen(
+                                    categories = categoryViewModel.allCategories,
+                                    expenses = expenseViewModel.allExpenses,
+                                    currentProfileId = activeProfileId,
+                                    onAddCategory = { category -> categoryViewModel.addCategory(category) },
+                                    onUpdateCategory = { category -> categoryViewModel.updateCategory(category) },
+                                    onDeleteCategory = { category -> categoryViewModel.deleteCategory(category) },
+                                    onNavigateBack = { navController.popBackStack() }
+                                )
+                            }
 
-                        composable(Screen.Budget.route) {
-                            val userSettings by userSettingsRepository.settings.collectAsState(initial = null)
-                            val activeProfileId = userSettings?.activeProfileId ?: 1
-                            BudgetScreen(
-                                budgets = budgetViewModel.allBudgets,
-                                categories = categoryViewModel.allCategories,
-                                burnRates = budgetViewModel.burnRates,
-                                onSaveBudget = { budget -> budgetViewModel.addBudget(budget) },
-                                onRefreshBurnRates = { budgetViewModel.refreshBurnRates() },
-                                onNavigateBack = { navController.popBackStack() },
-                                expenses = expenseViewModel.allExpenses,
-                                currentProfileId = activeProfileId
-                            )
-                        }
+                            composable(Screen.ExpenseHistory.route) {
+                                TransactionHistoryScreen(
+                                    expenses = expenseViewModel.allExpenses,
+                                    categories = categoryViewModel.allCategories,
+                                    budgets = budgetViewModel.allBudgets,
+                                    onDeleteExpense = { expense -> expenseViewModel.deleteExpense(expense) },
+                                    onEditExpense = { expense ->
+                                        navController.navigate(Screen.AddExpense.createRoute(expense.expenseId))
+                                    },
+                                    onNavigateBack = { navController.popBackStack() }
+                                )
+                            }
 
-                        composable(Screen.SavingsGoals.route) {
-                            SavingsGoalScreen(
-                                goals = savingsGoalViewModel.allGoals,
-                                onAddGoal = { goal -> savingsGoalViewModel.addGoal(goal) },
-                                onUpdateGoal = { goal -> savingsGoalViewModel.updateGoal(goal) },
-                                onNavigateBack = { navController.popBackStack() }
-                            )
-                        }
+                            composable(Screen.Budget.route) {
+                                BudgetScreen(
+                                    budgets = budgetViewModel.allBudgets,
+                                    categories = categoryViewModel.allCategories,
+                                    burnRates = budgetViewModel.burnRates,
+                                    onSaveBudget = { budget -> budgetViewModel.addBudget(budget) },
+                                    onRefreshBurnRates = { budgetViewModel.refreshBurnRates() },
+                                    onNavigateBack = { navController.popBackStack() },
+                                    expenses = expenseViewModel.allExpenses,
+                                    currentProfileId = activeProfileId,
+                                    savingsGoals = savingsGoalViewModel.allGoals,
+                                    onAddSavingsGoal = { goal -> savingsGoalViewModel.addGoal(goal) },
+                                    onUpdateSavingsGoal = { goal -> savingsGoalViewModel.updateGoal(goal) },
+                                    onDeleteSavingsGoal = { goal -> savingsGoalViewModel.deleteGoal(goal) }
+                                )
+                            }
 
-                        composable(Screen.Settings.route) {
-                            val userSettings by userSettingsRepository.settings.collectAsState(initial = null)
-                            val activeProfileId = userSettings?.activeProfileId ?: 1
-                            val settingsViewModel: com.ayaansaksham.spend_aware.viewmodel.SettingsViewModel = viewModel(
-                                factory = com.ayaansaksham.spend_aware.viewmodel.SettingsViewModelFactory(userPreferencesRepository)
-                            )
-                            
-                            com.ayaansaksham.spend_aware.ui.screens.SettingsScreen(
+                            composable(Screen.SavingsGoals.route) {
+                                SavingsGoalScreen(
+                                    goals = savingsGoalViewModel.allGoals,
+                                    onAddGoal = { goal -> savingsGoalViewModel.addGoal(goal) },
+                                    onUpdateGoal = { goal -> savingsGoalViewModel.updateGoal(goal) },
+                                    onDeleteGoal = { goal -> savingsGoalViewModel.deleteGoal(goal) },
+                                    onNavigateBack = { navController.popBackStack() }
+                                )
+                            }
+
+                            composable(Screen.Settings.route) {
+                                SettingsScreen(
                                 settingsViewModel = settingsViewModel,
                                 expenses = expenseViewModel.allExpenses,
                                 categories = categoryViewModel.allCategories,
-                                currentProfileId = activeProfileId,
-                                onProfileSelected = { newProfileId ->
-                                    val currentSettings = userSettings ?: com.ayaansaksham.spend_aware.data.local.entity.UserSettings(id = 1, firebaseUid = "local_only", activeProfileId = 1)
-                                    CoroutineScope(Dispatchers.IO).launch {
-                                        userSettingsRepository.saveSettings(currentSettings.copy(activeProfileId = newProfileId))
-                                    }
-                                },
                                 onNavigateToCategories = {
                                     navController.navigate(Screen.Categories.route)
                                 },
                                 onLogout = {
-                                    CoroutineScope(Dispatchers.IO).launch {
-                                        userPreferencesRepository.clearSession()
+                                        CoroutineScope(Dispatchers.IO).launch {
+                                            userPreferencesRepository.clearSession()
+                                        }
+                                        navController.navigate(Screen.Login.route) {
+                                            popUpTo(0) { inclusive = true }
+                                        }
                                     }
-                                    navController.navigate(Screen.Login.route) {
-                                        popUpTo(0) { inclusive = true }
-                                    }
-                                }
-                            )
+                                )
+                            }
                         }
                     }
-                }
                 }
             }
         }

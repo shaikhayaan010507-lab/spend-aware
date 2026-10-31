@@ -28,22 +28,13 @@ fun SettingsScreen(
     settingsViewModel: SettingsViewModel,
     expenses: kotlinx.coroutines.flow.StateFlow<List<com.ayaansaksham.spend_aware.data.local.entity.Expense>>? = null,
     categories: kotlinx.coroutines.flow.StateFlow<List<com.ayaansaksham.spend_aware.data.local.entity.Category>>? = null,
-    currentProfileId: Int = 1,
-    onProfileSelected: (Int) -> Unit = {},
     onNavigateToCategories: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     val userPersona by settingsViewModel.userPersona.collectAsState()
 
-    // Snackbar state for features that are coming soon
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
-    
-    val showNotImplemented = {
-        coroutineScope.launch {
-            snackbarHostState.showSnackbar("This feature is coming soon in V2!")
-        }
-    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -97,7 +88,6 @@ fun SettingsScreen(
                                 selected = userPersona == "Student",
                                 onClick = { 
                                     settingsViewModel.updatePersona("Student")
-                                    onProfileSelected(1) // Keep Room in sync
                                 },
                                 shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
                             ) {
@@ -107,7 +97,6 @@ fun SettingsScreen(
                                 selected = userPersona == "Employee",
                                 onClick = { 
                                     settingsViewModel.updatePersona("Employee")
-                                    onProfileSelected(2) // Keep Room in sync
                                 },
                                 shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
                             ) {
@@ -118,39 +107,9 @@ fun SettingsScreen(
                 }
             }
 
-            // Budget Settings Section
+            // Categories Section
             item {
-                SectionHeader("Budget Settings")
-                val incomeLabel = if (currentProfileId == 1) "Monthly Allowance" else "Income / Salary"
-                var rolloverChecked by remember { mutableStateOf(true) }
-                
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                ) {
-                    Column {
-                        SettingsRow(icon = Icons.Outlined.AccountBalanceWallet, title = incomeLabel, onClick = { showNotImplemented() })
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                        SettingsRow(icon = Icons.Outlined.Savings, title = "Savings Goal", onClick = { showNotImplemented() })
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                        SettingsRow(icon = Icons.Outlined.WarningAmber, title = "Alert Thresholds", value = "80%, 100%", onClick = { showNotImplemented() })
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                        SettingsSwitchRow(
-                            icon = Icons.Outlined.Loop,
-                            title = "Rollover Unused Budget",
-                            subtitle = "Redistribute remaining funds",
-                            checked = rolloverChecked,
-                            onCheckedChange = { rolloverChecked = it }
-                        )
-                    }
-                }
-            }
-
-            // Categories & Payments Section
-            item {
-                SectionHeader("Categories & Payments")
+                SectionHeader("Categories")
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -159,8 +118,6 @@ fun SettingsScreen(
                 ) {
                     Column {
                         SettingsRow(icon = Icons.Outlined.Category, title = "Manage Categories", onClick = onNavigateToCategories)
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                        SettingsRow(icon = Icons.Outlined.CreditCard, title = "Payment Methods", onClick = { showNotImplemented() })
                     }
                 }
             }
@@ -307,14 +264,6 @@ fun SettingsScreen(
                             title = "Log Out",
                             titleColor = MaterialTheme.colorScheme.error,
                             onClick = onLogout,
-                            showChevron = false
-                        )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                        SettingsRow(
-                            icon = Icons.Outlined.DeleteForever,
-                            title = "Reset Budget",
-                            titleColor = MaterialTheme.colorScheme.error,
-                            onClick = { showNotImplemented() },
                             showChevron = false
                         )
                     }

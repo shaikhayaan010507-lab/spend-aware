@@ -14,11 +14,14 @@ sealed class RealTimeAnomalyResult {
 
 object ExpenseAnomalyDetector {
 
+    const val DEFAULT_CEILING_AMOUNT = 10000.0
+    const val SAFE_TO_SPEND_PERCENTAGE_THRESHOLD = 50.0f
+
     fun detect(
         amount: Double,
         safeToSpendToday: Double,
         categoryHistory: List<Double>,
-        ceiling: Double = 10000.0,
+        ceiling: Double = DEFAULT_CEILING_AMOUNT,
         categoryName: String
     ): RealTimeAnomalyResult {
         // 1. Smart Check (IQR) if we have enough history
@@ -57,7 +60,7 @@ object ExpenseAnomalyDetector {
             
             android.util.Log.d("ANOMALY_DEBUG", "Computed Percentage: $percentage%")
 
-            val isAboveHalfSafe = safeToSpendToday > 0 && percentage > 50f
+            val isAboveHalfSafe = safeToSpendToday > 0 && percentage > SAFE_TO_SPEND_PERCENTAGE_THRESHOLD
 
             if (isAboveCeiling || isAboveHalfSafe) {
                 return RealTimeAnomalyResult.LargePercentage(amount, percentage)

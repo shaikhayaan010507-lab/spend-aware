@@ -1,6 +1,9 @@
 package com.ayaansaksham.spend_aware.data.local.dao
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
 import com.ayaansaksham.spend_aware.data.local.entity.Profile
 import kotlinx.coroutines.flow.Flow
 
@@ -8,17 +11,14 @@ import kotlinx.coroutines.flow.Flow
 interface ProfileDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertProfile(profile: Profile)
+    suspend fun insertProfile(profile: Profile): Long
 
-    @Update
-    suspend fun updateProfile(profile: Profile)
+    @Query("SELECT * FROM profiles WHERE userId = :userId ORDER BY profileId ASC")
+    fun getProfilesForUser(userId: Int): Flow<List<Profile>>
 
-    @Delete
-    suspend fun deleteProfile(profile: Profile)
-
-    @Query("SELECT * FROM profiles ORDER BY profileId ASC")
-    fun getAllProfiles(): Flow<List<Profile>>
+    @Query("SELECT * FROM profiles WHERE userId = :userId AND role = :role LIMIT 1")
+    suspend fun getProfileByRole(userId: Int, role: String): Profile?
 
     @Query("SELECT * FROM profiles WHERE profileId = :profileId LIMIT 1")
-    fun getProfileById(profileId: Int): Flow<Profile?>
+    suspend fun getProfileById(profileId: Int): Profile?
 }

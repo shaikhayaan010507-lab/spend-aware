@@ -5,26 +5,22 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.ayaansaksham.spend_aware.data.local.entity.Expense
 import com.ayaansaksham.spend_aware.data.repository.ExpenseRepository
-import com.ayaansaksham.spend_aware.data.repository.UserSettingsRepository
+import com.ayaansaksham.spend_aware.data.repository.UserPreferencesRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ExpenseViewModel(
     private val repository: ExpenseRepository,
-    private val userSettingsRepository: UserSettingsRepository
+    private val userPreferencesRepository: UserPreferencesRepository
 ) : ViewModel() {
 
-    private val activeProfileId = userSettingsRepository.settings.flatMapLatest { settings ->
-        kotlinx.coroutines.flow.flowOf(settings?.activeProfileId ?: 1)
-    }
+    private val activeProfileId = userPreferencesRepository.activeProfileIdFlow
 
     val allExpenses: StateFlow<List<Expense>> = activeProfileId
         .flatMapLatest { profileId ->
@@ -38,7 +34,7 @@ class ExpenseViewModel(
 
     fun addExpense(expense: Expense) {
         viewModelScope.launch {
-            val currentProfileId = userSettingsRepository.settings.first()?.activeProfileId ?: 1
+            val currentProfileId = userPreferencesRepository.activeProfileIdFlow.first()
             repository.insertExpense(expense.copy(profileId = currentProfileId))
         }
     }
@@ -55,8 +51,13 @@ class ExpenseViewModel(
         }
     }
 
-    suspend fun checkAnomaly(expense: Expense, safeToSpendToday: Double, categoryName: String, excludeExpenseId: Int? = null): com.ayaansaksham.spend_aware.domain.logic.RealTimeAnomalyResult {
-        val currentProfileId = userSettingsRepository.settings.first()?.activeProfileId ?: 1
+    suspend fun checkAnomaly(
+        expense: Expense,
+        safeToSpendToday: Double,
+        categoryName: String,
+        excludeExpenseId: Int? = null
+    ): com.ayaansaksham.spend_aware.domain.logic.RealTimeAnomalyResult {
+        val currentProfileId = userPreferencesRepository.activeProfileIdFlow.first()
         
         val history = if (excludeExpenseId != null) {
             repository.getCategoryAmountsExcluding(expense.categoryId ?: -1, currentProfileId, excludeExpenseId)
@@ -68,7 +69,7 @@ class ExpenseViewModel(
             amount = expense.amount,
             safeToSpendToday = safeToSpendToday,
             categoryHistory = history,
-            ceiling = 10000.0, // Fixed default ceiling since settings doesn't have it explicitly yet
+            ceiling = 10000.0,
             categoryName = categoryName
         )
     }
@@ -76,12 +77,12 @@ class ExpenseViewModel(
 
 class ExpenseViewModelFactory(
     private val repository: ExpenseRepository,
-    private val userSettingsRepository: UserSettingsRepository
+    private val userPreferencesRepository: UserPreferencesRepository
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ExpenseViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return ExpenseViewModel(repository, userSettingsRepository) as T
+            return ExpenseViewModel(repository, userPreferencesRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
